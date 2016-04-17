@@ -155,7 +155,7 @@ public class MainActivity extends AppCompatActivity
             @Override
             public void run() {
 
-                Toast.makeText(MainActivity.this, "" + count, Toast.LENGTH_SHORT);
+                Toast.makeText(MainActivity.this, "" + count, Toast.LENGTH_SHORT).show();
                 count--;
                 t.schedule(tTask, 1000);
             }
