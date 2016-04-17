@@ -68,20 +68,21 @@ public class ContactsActivity extends Activity implements View.OnClickListener{
 
 
         String phoneNumber = etEnterContactNumber.getText().toString();
-        phoneNumber = PhoneNumberUtils.formatNumber(phoneNumber);
-        Toast.makeText(this, phoneNumber, Toast.LENGTH_SHORT).show();
-        if(PhoneNumberUtils.isGlobalPhoneNumber(phoneNumber) && Pattern.matches(PHONE_REGEX, phoneNumber)){
-
-            contactsStringSet = sPref.getStringSet(CONTACTS_SET_KEY, contactsDefaultSet);
-            contactsStringSet.add(PhoneNumberUtils.formatNumber(phoneNumber));
-            ed.clear();
-            ed.putStringSet(CONTACTS_SET_KEY, contactsStringSet);
-            ed.commit();
-            etEnterContactNumber.setText("");
-            Toast.makeText(this, "Contact saved", Toast.LENGTH_SHORT).show();
-        } else {
-            etEnterContactNumber.setError("Please enter valide phone number");
-        }
+        SharedPrefsUtils.setStringPreference(this, CONTACTS_SET_KEY, phoneNumber);
+//        phoneNumber = PhoneNumberUtils.formatNumber(phoneNumber);
+//        Toast.makeText(this, phoneNumber, Toast.LENGTH_SHORT).show();
+//        if(PhoneNumberUtils.isGlobalPhoneNumber(phoneNumber) && Pattern.matches(PHONE_REGEX, phoneNumber)){
+//
+//            contactsStringSet = sPref.getStringSet(CONTACTS_SET_KEY, contactsDefaultSet);
+//            contactsStringSet.add(PhoneNumberUtils.formatNumber(phoneNumber));
+//            ed.clear();
+//            ed.putStringSet(CONTACTS_SET_KEY, contactsStringSet);
+//            ed.commit();
+//            etEnterContactNumber.setText("");
+//            Toast.makeText(this, "Contact saved", Toast.LENGTH_SHORT).show();
+//        } else {
+//            etEnterContactNumber.setError("Please enter valide phone number");
+//        }
     }
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)

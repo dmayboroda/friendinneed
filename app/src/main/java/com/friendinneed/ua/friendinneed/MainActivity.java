@@ -1,6 +1,7 @@
 package com.friendinneed.ua.friendinneed;
 
 import android.app.AlertDialog;
+import android.app.DialogFragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -10,7 +11,9 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Environment;
+import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -21,10 +24,13 @@ import android.support.v7.widget.Toolbar;
 import android.telephony.SmsManager;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
@@ -66,7 +72,7 @@ public class MainActivity extends AppCompatActivity
     private float gyroZ;
     List<List<Double>> sample;
     List<List<Double>> labels;
-    private final double G_POINT = 1.3 * 9.8;
+    private final double G_POINT = 1.8 * 9.8;
 
     boolean writeData = false;
 
@@ -76,6 +82,7 @@ public class MainActivity extends AppCompatActivity
         @Override
         public void run() {
             sendRequest();
+
         }
     };
     private int count;
@@ -132,35 +139,49 @@ public class MainActivity extends AppCompatActivity
         sample = new ArrayList<List<Double>>();
         labels = new ArrayList<List<Double>>();
         writeData = true;
-        AlertDialog.Builder adb = new AlertDialog.Builder(MainActivity.this);
-        adb.setTitle("Did You fall?").setPositiveButton("YES!", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                writeData = false;
-                save(true);
-                callForHelp();
-//                sendRequest();
-            }
-        }).setNegativeButton("NO!", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                writeData = false;
-                save(false);
-            }
-        }).show();
-        sendToTensorTimer.schedule(sendToTensorTimerTask, 10000);
-        final Timer t =new Timer();
-        count = 10;
-        tTask = new TimerTask() {
+//        TickerDialog td = new TickerDialog();
+//        td.show(getFragmentManager(), "dialog");
+
+//        AlertDialog.Builder adb = new AlertDialog.Builder(MainActivity.this);
+//        adb.setTitle("Did You fall?").setPositiveButton("YES!", new DialogInterface.OnClickListener() {
+//            @Override
+//            public void onClick(DialogInterface dialog, int which) {
+//                writeData = false;
+//                save(true);
+//                callForHelp();
+////                sendRequest();
+//            }
+//        }).setNegativeButton("NO!", new DialogInterface.OnClickListener() {
+//            @Override
+//            public void onClick(DialogInterface dialog, int which) {
+//                writeData = false;
+//                save(false);
+//            }
+//        }).show();
+//        sendToTensorTimer.purge();
+        sendToTensorTimer.schedule(new TimerTask() {
             @Override
             public void run() {
+                sendRequest();
 
-                Toast.makeText(MainActivity.this, "" + count, Toast.LENGTH_SHORT).show();
-                count--;
-                t.schedule(tTask, 1000);
             }
-        };
-        t.schedule(tTask, 1000);
+        }, 2000);
+//        final Timer t =new Timer();
+//        count = 10;
+//        tTask = new TimerTask() {
+//            @Override
+//            public void run() {
+//                runOnUiThread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        Toast.makeText(MainActivity.this, "" + count, Toast.LENGTH_SHORT).show();
+//                    }
+//                });
+//                count--;
+//                //t.schedule(tTask, 1000);
+//            }
+//        };
+//        t.schedule(tTask, 1000, 1000);
     }
 
 
@@ -365,6 +386,14 @@ public class MainActivity extends AppCompatActivity
             = MediaType.parse("application/json; charset=utf-8");
     public OkHttpClient client = new OkHttpClient();
     void sendRequest(){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(MainActivity.this, "Sending request...", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        writeData=false;
         new AsyncTask<Void, Void, Void>() {
             String response;
 
@@ -372,16 +401,18 @@ public class MainActivity extends AppCompatActivity
             @Override
             protected void onPostExecute(Void aVoid) {
                 super.onPostExecute(aVoid);
-                Log.i("response = ", response );
+                Log.i("response = ", ""+response );
                 if ("action_fall".equals(response)) {
-                    callForHelp();
+                    TickerDialog td = new TickerDialog();
+                    td.show(getFragmentManager(), "dialog");
+//                    callForHelp();
                 }
             }
 
             @Override
             protected Void doInBackground(Void... params) {
                 try {
-                    response = post("http://192.168.43.184:8087", new Gson().toJson(sample));
+                    response = post("http://192.168.43.184:8086", new Gson().toJson(sample));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -394,8 +425,8 @@ public class MainActivity extends AppCompatActivity
     private void callForHelp() {
         try {
             SmsManager smsManager = SmsManager.getDefault();
-            String phone = SharedPrefsUtils.getStringPreference(MainActivity.this, "phone");
-            smsManager.sendTextMessage(TextUtils.isEmpty(phone) ? "+380976673962" : phone, null, "SOS message - bingo!, geo:50.4174038,30.474646", null, null);
+            String phone = SharedPrefsUtils.getStringPreference(MainActivity.this, "contacts2");
+            smsManager.sendTextMessage(TextUtils.isEmpty(phone) ? "+380976673962" : phone, null, "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:50.4174038,30.474646", null, null);
             Toast.makeText(getApplicationContext(), "SMS sent.", Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             Toast.makeText(getApplicationContext(), "SMS failed, please try again.", Toast.LENGTH_LONG).show();
@@ -416,6 +447,62 @@ public class MainActivity extends AppCompatActivity
     private boolean checkForJolt() {
         float sum = (accX * accX) + (accY * accY) + (accZ * accZ);
         double checkVar = Math.sqrt(Double.parseDouble(Float.toString(sum)));
-        return (checkVar > G_POINT);
+        return (checkVar > G_POINT && !writeData);
+    }
+
+    class TickerDialog extends DialogFragment implements View.OnClickListener {
+
+
+
+        TextView timerTextView;
+        CountDownTimer countDownTimer = new CountDownTimer(10000, 1000){
+
+            @Override
+            public void onTick(long millisUntilFinished) {
+                timerTextView.setText("" + millisUntilFinished/1000);
+            }
+
+            @Override
+            public void onFinish() {
+                callForHelp();
+                timerTextView.setText("Message sending");
+            }
+        };
+
+
+
+        @Nullable
+        @Override
+        public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+
+            getDialog().setTitle(R.string.dialog_title);
+            View dialogView = inflater.inflate(R.layout.dialog_layout, null);
+            dialogView.findViewById(R.id.btnSend).setOnClickListener(this);
+            dialogView.findViewById(R.id.btnDiscard).setOnClickListener(this);
+            timerTextView = (TextView) dialogView.findViewById(R.id.dialog_timer_text);
+
+            countDownTimer.start();
+
+            return dialogView;
+        }
+
+
+        @Override
+        public void onClick(View v) {
+            switch (v.getId()){
+                case R.id.btnSend:
+                    writeData = false;
+                    save(true);
+                    callForHelp();
+                    break;
+                case R.id.btnDiscard:
+                    countDownTimer.cancel();
+                    writeData = false;
+                    save(false);
+                    dismiss();
+            }
+        }
+
+
     }
 }

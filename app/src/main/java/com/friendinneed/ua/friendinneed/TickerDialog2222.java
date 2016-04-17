@@ -13,7 +13,8 @@ import android.widget.TextView;
 /**
  * Created by mymac on 4/17/16.
  */
-public class Dialog extends DialogFragment implements View.OnClickListener {
+public class TickerDialog2222 extends DialogFragment implements View.OnClickListener {
+
 
 
     TextView timerTextView;
@@ -30,6 +31,8 @@ public class Dialog extends DialogFragment implements View.OnClickListener {
             timerTextView.setText("Message sending");
         }
     };
+
+
 
     @Nullable
     @Override
