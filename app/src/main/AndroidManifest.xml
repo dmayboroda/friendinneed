@@ -20,6 +20,25 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".ContactsActivity"
+            android:screenOrientation="portrait"
+            >
+        </activity>
+
+        <receiver
+            android:name=".HelpWidget"
+            android:icon="@android:drawable/star_big_on"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                <action android:name="image_click" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_metadata"/>
+
+        </receiver>
     </application>
 
 </manifest>
