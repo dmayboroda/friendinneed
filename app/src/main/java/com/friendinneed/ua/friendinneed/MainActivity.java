@@ -8,6 +8,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.design.widget.FloatingActionButton;
@@ -17,12 +18,16 @@ import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.telephony.SmsManager;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
+
+import com.google.gson.Gson;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -35,6 +40,14 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 import static java.lang.Math.sqrt;
 
@@ -53,10 +66,20 @@ public class MainActivity extends AppCompatActivity
     private float gyroZ;
     List<List<Double>> sample;
     List<List<Double>> labels;
+    private final double G_POINT = 1.3 * 9.8;
 
     boolean writeData = false;
 
     Button manageContactsButton;
+    Timer sendToTensorTimer = new Timer();
+    TimerTask sendToTensorTimerTask = new TimerTask() {
+        @Override
+        public void run() {
+            sendRequest();
+        }
+    };
+    private int count;
+    private TimerTask tTask;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,24 +100,8 @@ public class MainActivity extends AppCompatActivity
 
             @Override
             public void onClick(View view) {
-                //start writing of data
-                sample = new ArrayList<List<Double>>();
-                labels = new ArrayList<List<Double>>();
-                writeData = true;
-                AlertDialog.Builder adb = new AlertDialog.Builder(MainActivity.this);
-                adb.setTitle("Did You fall?").setPositiveButton("YES!", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        writeData = false;
-                        save(true);
-                    }
-                }).setNegativeButton("NO!", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        writeData = false;
-                        save(false);
-                    }
-                }).show();
+                startSavingRawData();
+
             }
         });
 
@@ -118,6 +125,42 @@ public class MainActivity extends AppCompatActivity
             }
         });
 
+    }
+
+    private void startSavingRawData() {
+        //start writing of data
+        sample = new ArrayList<List<Double>>();
+        labels = new ArrayList<List<Double>>();
+        writeData = true;
+        AlertDialog.Builder adb = new AlertDialog.Builder(MainActivity.this);
+        adb.setTitle("Did You fall?").setPositiveButton("YES!", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                writeData = false;
+                save(true);
+                callForHelp();
+//                sendRequest();
+            }
+        }).setNegativeButton("NO!", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                writeData = false;
+                save(false);
+            }
+        }).show();
+        sendToTensorTimer.schedule(sendToTensorTimerTask, 10000);
+        final Timer t =new Timer();
+        count = 10;
+        tTask = new TimerTask() {
+            @Override
+            public void run() {
+
+                Toast.makeText(MainActivity.this, "" + count, Toast.LENGTH_SHORT);
+                count--;
+                t.schedule(tTask, 1000);
+            }
+        };
+        t.schedule(tTask, 1000);
     }
 
 
@@ -150,24 +193,24 @@ public class MainActivity extends AppCompatActivity
         return ret;
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        try {
-            Log.i("123test_raw", readFromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_data"));
-            Log.i("123test_labels", readFromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_labels"));
-//            Toast.makeText(getBaseContext(), s,Toast.LENGTH_SHORT).show();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+//    @Override
+//    protected void onResume() {
+//        super.onResume();
+//        try {
+//            Log.i("123test_raw", readFromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_data"));
+//            Log.i("123test_labels", readFromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_labels"));
+////            Toast.makeText(getBaseContext(), s,Toast.LENGTH_SHORT).show();
+//
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
 
     private void save(boolean isFall) {
 
         for (int i = 0; i < sample.size(); i++) {
             List<Double> label = new ArrayList<>();
-            if (i < sample.size() - 1 || !isFall) {
+            if (/*i < sample.size() - 1 ||*/ !isFall) {
                 label.add(0.);
                 label.add(1.);
             } else {
@@ -176,6 +219,7 @@ public class MainActivity extends AppCompatActivity
             }
             labels.add(label);
         }
+        /*
         //write to file
         try {
              // true will be same as Context.MODE_APPEND
@@ -212,7 +256,7 @@ public class MainActivity extends AppCompatActivity
 
         } catch (Exception e) {
             e.printStackTrace();
-        }
+        }*/
     }
 
     @Override
@@ -295,7 +339,9 @@ public class MainActivity extends AppCompatActivity
             }
 
         }
-
+        if (checkForJolt()) {
+            startSavingRawData();
+        }
         //Log.i("raw_data", "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ + ", gyroX=" + gyroX + ", gyroY="+ gyroY +", gyroZ=" +gyroZ );
         if (writeData) {
             List<Double> data = new ArrayList<>();
@@ -313,5 +359,63 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
+    }
+
+    public static final MediaType JSON
+            = MediaType.parse("application/json; charset=utf-8");
+    public OkHttpClient client = new OkHttpClient();
+    void sendRequest(){
+        new AsyncTask<Void, Void, Void>() {
+            String response;
+
+
+            @Override
+            protected void onPostExecute(Void aVoid) {
+                super.onPostExecute(aVoid);
+                Log.i("response = ", response );
+                if ("action_fall".equals(response)) {
+                    callForHelp();
+                }
+            }
+
+            @Override
+            protected Void doInBackground(Void... params) {
+                try {
+                    response = post("http://192.168.43.184:8087", new Gson().toJson(sample));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }
+        }.execute();
+
+    }
+
+    private void callForHelp() {
+        try {
+            SmsManager smsManager = SmsManager.getDefault();
+            String phone = SharedPrefsUtils.getStringPreference(MainActivity.this, "phone");
+            smsManager.sendTextMessage(TextUtils.isEmpty(phone) ? "+380976673962" : phone, null, "SOS message - bingo!, geo:50.4174038,30.474646", null, null);
+            Toast.makeText(getApplicationContext(), "SMS sent.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(getApplicationContext(), "SMS failed, please try again.", Toast.LENGTH_LONG).show();
+            e.printStackTrace();
+        }
+    }
+
+    String post(String url, String json) throws IOException {
+        RequestBody body = RequestBody.create(JSON, json);
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .build();
+        Response response = client.newCall(request).execute();
+        return response.body().string();
+    }
+
+    private boolean checkForJolt() {
+        float sum = (accX * accX) + (accY * accY) + (accZ * accZ);
+        double checkVar = Math.sqrt(Double.parseDouble(Float.toString(sum)));
+        return (checkVar > G_POINT);
     }
 }

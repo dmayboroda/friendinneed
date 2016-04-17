@@ -13,4 +13,12 @@
         android:layout_height="match_parent"
         android:textSize="44sp"
         />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Manage Contacts"
+        android:layout_marginTop="200dp"
+        android:layout_marginLeft="20dp"
+        android:id="@+id/button_manage_contacts"/>
 </RelativeLayout>
