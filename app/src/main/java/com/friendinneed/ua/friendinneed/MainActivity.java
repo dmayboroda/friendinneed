@@ -3,6 +3,7 @@ package com.friendinneed.ua.friendinneed;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -20,6 +21,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
@@ -53,6 +55,8 @@ public class MainActivity extends AppCompatActivity
     List<List<Double>> labels;
 
     boolean writeData = false;
+
+    Button manageContactsButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -102,6 +106,18 @@ public class MainActivity extends AppCompatActivity
 
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
+
+
+
+        manageContactsButton = (Button) findViewById(R.id.button_manage_contacts);
+        manageContactsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(getBaseContext(), ContactsActivity.class);
+                startActivity(intent);
+            }
+        });
+
     }
 
 
