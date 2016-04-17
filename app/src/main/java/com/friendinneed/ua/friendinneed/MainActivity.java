@@ -8,9 +8,9 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
-import android.support.design.widget.Snackbar;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
@@ -50,6 +50,8 @@ public class MainActivity extends AppCompatActivity
     private float gyroY;
     private float gyroZ;
     List<List<Double>> sample;
+    List<List<Double>> labels;
+
     boolean writeData = false;
 
     @Override
@@ -66,7 +68,6 @@ public class MainActivity extends AppCompatActivity
         mSensorManager.registerListener(this, mGyroSensor, SensorManager.SENSOR_DELAY_FASTEST);
 
 
-
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
 
@@ -74,6 +75,7 @@ public class MainActivity extends AppCompatActivity
             public void onClick(View view) {
                 //start writing of data
                 sample = new ArrayList<List<Double>>();
+                labels = new ArrayList<List<Double>>();
                 writeData = true;
                 AlertDialog.Builder adb = new AlertDialog.Builder(MainActivity.this);
                 adb.setTitle("Did You fall?").setPositiveButton("YES!", new DialogInterface.OnClickListener() {
@@ -103,28 +105,27 @@ public class MainActivity extends AppCompatActivity
     }
 
 
-    private String readFromFile() {
+    private String readFromFile(String path) {
 
         String ret = "";
 
         try {
-            InputStream inputStream = openFileInput("mytextfile");
+            InputStream inputStream = new FileInputStream(new File(path));
 
-            if ( inputStream != null ) {
+            if (inputStream != null) {
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
                 BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
                 String receiveString = "";
                 StringBuilder stringBuilder = new StringBuilder();
 
-                while ( (receiveString = bufferedReader.readLine()) != null ) {
+                while ((receiveString = bufferedReader.readLine()) != null) {
                     stringBuilder.append(receiveString);
                 }
 
                 inputStream.close();
                 ret = stringBuilder.toString();
             }
-        }
-        catch (FileNotFoundException e) {
+        } catch (FileNotFoundException e) {
             Log.e("login activity", "File not found: " + e.toString());
         } catch (IOException e) {
             Log.e("login activity", "Can not read file: " + e.toString());
@@ -137,7 +138,8 @@ public class MainActivity extends AppCompatActivity
     protected void onResume() {
         super.onResume();
         try {
-            Log.i("123test", readFromFile());
+            Log.i("123test_raw", readFromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_data"));
+            Log.i("123test_labels", readFromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_labels"));
 //            Toast.makeText(getBaseContext(), s,Toast.LENGTH_SHORT).show();
 
         } catch (Exception e) {
@@ -146,23 +148,47 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void save(boolean isFall) {
-        for (List<Double> list : sample) {
-            list.add((isFall)?1.0:0.0);
+
+        for (int i = 0; i < sample.size(); i++) {
+            List<Double> label = new ArrayList<>();
+            if (i < sample.size() - 1 || !isFall) {
+                label.add(0.);
+                label.add(1.);
+            } else {
+                label.add(1.);
+                label.add(0.);
+            }
+            labels.add(label);
         }
         //write to file
         try {
-            FileOutputStream fileout=openFileOutput("mytextfile", MODE_APPEND);
-            OutputStreamWriter outputWriter=new OutputStreamWriter(fileout);
+             // true will be same as Context.MODE_APPEND
+//            FileOutputStream fileout = openFileOutput(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_data", MODE_APPEND);
+            FileOutputStream fileout = new FileOutputStream (new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_data"), true);
+            OutputStreamWriter outputWriter = new OutputStreamWriter(fileout);
             StringBuffer sb = new StringBuffer();
             for (List<Double> data : sample) {
                 for (Double d : data) {
                     sb.append(String.valueOf(d)).append(",");
                 }
-                sb.append("\n");
+                sb.append("\r\n");
             }
 
             outputWriter.write(sb.toString());
             outputWriter.close();
+
+            FileOutputStream fileoutLabels = new FileOutputStream (new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_labels"), true);
+            OutputStreamWriter outputWriterLabels = new OutputStreamWriter(fileoutLabels);
+            StringBuffer sbLabels = new StringBuffer();
+            for (List<Double> data : labels) {
+                for (Double d : data) {
+                    sbLabels.append(String.valueOf(d)).append(",");
+                }
+                sbLabels.append("\r\n");
+            }
+
+            outputWriterLabels.write(sbLabels.toString());
+            outputWriterLabels.close();
 
             //display file saved message
             Toast.makeText(getBaseContext(), "File saved successfully!",
