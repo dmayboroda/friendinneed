@@ -58,6 +58,9 @@ import static java.lang.Math.sqrt;
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, SensorEventListener {
 
+    /** Use this constant for identify action which comes from IneedService to MainActivity.  */
+    public static final String SERVICE_ACTION = MainActivity.class.getSimpleName() + "_service";
+
     private static final double EPSILON = 0.0;
     private SensorManager mSensorManager;
     private Sensor mAccelerometerSensor;

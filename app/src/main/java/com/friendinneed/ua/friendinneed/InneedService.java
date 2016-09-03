@@ -17,9 +17,6 @@ import android.support.v4.app.NotificationCompat;
  */
 public class InneedService extends Service {
 
-    /** Use this constant for identify action which comes from service to MainActivity.  */
-    public static final String MAIN_ACTION = InneedService.class.getSimpleName() + "_main";
-
     private static final String ACTION_START = InneedService.class.getSimpleName() + "_start";
     private static final String ACTION_STOP  = InneedService.class.getSimpleName() + "_stop";
 
@@ -74,7 +71,7 @@ public class InneedService extends Service {
 
     private PendingIntent createIntent() {
         Intent intent = new Intent(this, MainActivity.class);
-        intent.setAction(MAIN_ACTION);
+        intent.setAction(MainActivity.SERVICE_ACTION);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                       | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         PendingIntent pending = PendingIntent.getActivity(this, 0, intent, 0);
