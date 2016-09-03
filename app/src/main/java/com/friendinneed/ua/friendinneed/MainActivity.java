@@ -131,6 +131,7 @@ public class MainActivity extends AppCompatActivity
                 startActivity(intent);
             }
         });
+        InneedService.startInneedService(this);
 
     }
 

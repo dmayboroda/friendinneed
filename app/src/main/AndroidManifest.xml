@@ -41,6 +41,8 @@
                 android:resource="@xml/widget_metadata"/>
 
         </receiver>
+
+        <service android:name=".InneedService"/>
     </application>
 
 </manifest>
