@@ -1,9 +1,9 @@
 package com.friendinneed.ua.friendinneed.model;
 
+import com.friendinneed.ua.friendinneed.BuildConfig;
 import com.google.gson.annotations.Expose;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
 import static com.friendinneed.ua.friendinneed.model.DataSample.DATA_SAMPLE_TYPE_ACCELEROMETER;
@@ -17,9 +17,13 @@ public class DataSampleRequest {
     private List<GyroscopeDataSample> gyro = new ArrayList<>();
     @Expose
     private Integer label;
+    @Expose
+    private Integer version;
 
-    public DataSampleRequest(LinkedList<DataSample> data) {
-        for (DataSample sample : data) {
+    public DataSampleRequest(DataSample[] dataSamples) {
+        label = 0;
+        version = BuildConfig.VERSION_CODE;
+        for (DataSample sample : dataSamples) {
             switch (sample.getDataType()) {
                 case DATA_SAMPLE_TYPE_ACCELEROMETER:
                     acc.add((AccelerometerDataSample) sample);
@@ -29,7 +33,6 @@ public class DataSampleRequest {
                     break;
             }
         }
-
     }
 
     public List<AccelerometerDataSample> getAcc() {
@@ -71,4 +74,11 @@ public class DataSampleRequest {
         return this;
     }
 
+    public Integer getVersion() {
+        return version;
+    }
+
+    public void setVersion(Integer version) {
+        this.version = version;
+    }
 }

@@ -32,6 +32,7 @@ import android.widget.Toast;
 
 import com.friendinneed.ua.friendinneed.model.AccelerometerDataSample;
 import com.friendinneed.ua.friendinneed.model.DataSample;
+import com.friendinneed.ua.friendinneed.model.DataSampleRequest;
 import com.friendinneed.ua.friendinneed.model.GyroscopeDataSample;
 import com.google.gson.Gson;
 
@@ -388,7 +389,7 @@ public class MainActivity extends AppCompatActivity
         queue.addSample(sampleAccelerometer);
         queue.addSample(sampleGyroscope);
 
-        Log.e("raw_data_count ", String.valueOf(queue.size()));
+        //Log.e("raw_data_count ", String.valueOf(queue.size()));
     }
 
     @Override
@@ -426,7 +427,9 @@ public class MainActivity extends AppCompatActivity
             @Override
             protected Void doInBackground(Void... params) {
                 try {
-                    response = post("http://192.168.43.184:8086", new Gson().toJson(sample));
+                    //response = post("http://192.168.43.184:8086", new Gson().toJson(sample));
+                    response = postDataQueueSamples("http://friendinneedserver6099.cloudapp.net:5000", queue.dump());
+
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -457,6 +460,18 @@ public class MainActivity extends AppCompatActivity
         Response response = client.newCall(request).execute();
         return response.body().string();
     }
+
+    String postDataQueueSamples(String url, DataSample[] dataSamples) throws IOException {
+        DataSampleRequest dataSampleRequest = new DataSampleRequest(dataSamples);
+        RequestBody body = RequestBody.create(JSON, new Gson().toJson(dataSampleRequest));
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .build();
+        Response response = client.newCall(request).execute();
+        return response.body().string();
+    }
+
 
     private boolean checkForJolt() {
         float sum = (accX * accX) + (accY * accY) + (accZ * accZ);
