@@ -15,6 +15,13 @@
         android:textSize="44sp"
         />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/timer_text"
+        android:text="DefaultText"
+        android:paddingTop="120dp"/>
+
     <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

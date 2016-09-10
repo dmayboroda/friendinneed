@@ -10,4 +10,11 @@
     <string name="send">Send alarm</string>
     <string name="discard">Discard</string>
     <string name="dialog_title">Fall detected</string>
+    <string name="title_settings_activity">Settings</string>
+    <string name="timer_pref_title">Timeout after fall: %d sec</string>
+    <string name="timer_dialog_title">Please select fall timer value</string>
+    <string name="tracking_turn_on">Turn on tracking</string>
+    <string name="tracking_is_on">Tracking is running</string>
+    <string name="no_string">No</string>
+    <string name="yes_string">Yes</string>
 </resources>

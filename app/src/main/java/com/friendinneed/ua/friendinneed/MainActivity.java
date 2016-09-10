@@ -1,7 +1,9 @@
 package com.friendinneed.ua.friendinneed;
 
+import android.app.AlertDialog;
 import android.app.DialogFragment;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -10,6 +12,8 @@ import android.hardware.SensorManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Environment;
+import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
@@ -30,18 +34,17 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.friendinneed.ua.friendinneed.model.AccelerometerDataSample;
-import com.friendinneed.ua.friendinneed.model.DataSample;
-import com.friendinneed.ua.friendinneed.model.GyroscopeDataSample;
 import com.google.gson.Gson;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
@@ -57,9 +60,6 @@ import static java.lang.Math.sqrt;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, SensorEventListener {
-
-    /** Use this constant for identify action which comes from IneedService to MainActivity.  */
-    public static final String SERVICE_ACTION = MainActivity.class.getSimpleName() + "_service";
 
     private static final double EPSILON = 0.0;
     private SensorManager mSensorManager;
@@ -77,6 +77,9 @@ public class MainActivity extends AppCompatActivity
 
     boolean writeData = false;
 
+    int timer;
+    TextView timerText;
+
     Button manageContactsButton;
     Timer sendToTensorTimer = new Timer();
     TimerTask sendToTensorTimerTask = new TimerTask() {
@@ -89,12 +92,19 @@ public class MainActivity extends AppCompatActivity
     private int count;
     private TimerTask tTask;
 
-    private final DataQueue queue = new DataQueue(10000);
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        int timer = PreferenceManager.getDefaultSharedPreferences(this).getInt("key_number", 15);
+
+        String strTimer = "ddd";
+        timerText = (TextView) findViewById(R.id.timer_text);
+        timerText.setText("Timer = " + Integer.toString(timer));
+
+
+
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -134,7 +144,6 @@ public class MainActivity extends AppCompatActivity
                 startActivity(intent);
             }
         });
-        InneedService.startInneedService(this);
 
     }
 
@@ -218,9 +227,11 @@ public class MainActivity extends AppCompatActivity
         return ret;
     }
 
-//    @Override
-//    protected void onResume() {
-//        super.onResume();
+    @Override
+    protected void onResume() {
+        super.onResume();
+        timer = PreferenceManager.getDefaultSharedPreferences(this).getInt("key_number", 15);
+        timerText.setText("Timer = " + Integer.toString(timer));
 //        try {
 //            Log.i("123test_raw", readFromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_data"));
 //            Log.i("123test_labels", readFromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/file_labels"));
@@ -229,7 +240,7 @@ public class MainActivity extends AppCompatActivity
 //        } catch (Exception e) {
 //            e.printStackTrace();
 //        }
-//    }
+    }
 
     private void save(boolean isFall) {
 
@@ -310,9 +321,9 @@ public class MainActivity extends AppCompatActivity
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+           startActivity(new Intent(this, SettingsActivity.class));
             return true;
         }
-
         return super.onOptionsItemSelected(item);
     }
 
@@ -379,16 +390,6 @@ public class MainActivity extends AppCompatActivity
             sample.add(data);
         }
 
-        //Log.e("raw_data ", "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ + ", gyroX=" + gyroX + ", gyroY="+ gyroY +", gyroZ=" +gyroZ );
-
-        final DataSample sampleAccelerometer = new AccelerometerDataSample(accX, accY, accZ);
-
-        final DataSample sampleGyroscope = new GyroscopeDataSample(gyroX, gyroY, gyroZ);
-
-        queue.addSample(sampleAccelerometer);
-        queue.addSample(sampleGyroscope);
-
-        Log.e("raw_data_count ", String.valueOf(queue.size()));
     }
 
     @Override
@@ -396,43 +397,43 @@ public class MainActivity extends AppCompatActivity
 
     }
 
-    public static final MediaType JSON
-            = MediaType.parse("application/json; charset=utf-8");
+    public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     public OkHttpClient client = new OkHttpClient();
-    void sendRequest(){
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                Toast.makeText(MainActivity.this, "Sending request...", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        writeData=false;
-        new AsyncTask<Void, Void, Void>() {
-            String response;
-
-
-            @Override
-            protected void onPostExecute(Void aVoid) {
-                super.onPostExecute(aVoid);
-                Log.i("response = ", ""+response );
-                if ("action_fall".equals(response)) {
-                    TickerDialog td = new TickerDialog();
-                    td.show(getFragmentManager(), "dialog");
-//                    callForHelp();
+        void sendRequest(){
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(MainActivity.this, "Sending request...", Toast.LENGTH_SHORT).show();
                 }
-            }
+            });
 
-            @Override
-            protected Void doInBackground(Void... params) {
-                try {
-                    response = post("http://192.168.43.184:8086", new Gson().toJson(sample));
-                } catch (IOException e) {
-                    e.printStackTrace();
+            writeData=false;
+            new AsyncTask<Void, Void, Void>() {
+                String response;
+
+
+                @Override
+                protected void onPostExecute(Void aVoid) {
+                    super.onPostExecute(aVoid);
+                    Log.i("response = ", ""+response );
+                    if ("action_fall".equals(response)) {
+                        TickerDialog td = new TickerDialog();
+                        td.show(getFragmentManager(), "dialog");
+    //                    callForHelp();
+                        timerText.setText(new String("s"));
+                    }
                 }
-                return null;
-            }
-        }.execute();
+
+                @Override
+                protected Void doInBackground(Void... params) {
+                    try {
+                        response = post("http://192.168.43.184:8086", new Gson().toJson(sample));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                }
+            }.execute();
 
     }
 
