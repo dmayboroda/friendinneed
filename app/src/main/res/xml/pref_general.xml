@@ -3,13 +3,19 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+
+
+    <EditTextPreference
+        android:id="@+id/edit_text_pref"
+        android:key="edit_text_pref"/>
+
     <SwitchPreference
         android:key="@string/tracking_key"
         android:summaryOff="@string/tracking_turn_on"
         android:summaryOn="@string/tracking_is_on"
         android:switchTextOff="@string/no_string"
         android:switchTextOn="@string/yes_string"
-        android:textSize="15sp"/>
+        android:textSize="18sp"/>
 
     <com.friendinneed.ua.friendinneed.NumberPickerPreference
         android:key="@string/timer_key"

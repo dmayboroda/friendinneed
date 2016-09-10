@@ -36,12 +36,13 @@ public class InneedService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent.getAction().equals(ACTION_START)) {
-            start();
-        } else if (intent.getAction().equals(ACTION_STOP)) {
-            stop();
-        }
+//        if (intent.getAction().equals(ACTION_START)) {
+//            start();
+//        } else if (intent.getAction().equals(ACTION_STOP)) {
+//            stop();
+//        }
         return START_STICKY;
+
     }
 
     @Nullable @Override
