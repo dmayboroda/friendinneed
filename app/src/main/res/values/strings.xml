@@ -10,4 +10,10 @@
     <string name="send">Send alarm</string>
     <string name="discard">Discard</string>
     <string name="dialog_title">Fall detected</string>
+    <string name="add_contact">Add contact</string>
+    <string name="turn_on_tracking">Turn on tracking for start</string>
+    <string name="emergency_contacts">Emergency cotacts</string>
+    <string name="number_picker_settings_text">Period of time before sending message after falling in seconds</string>
+    <string name="tracking_is_running">Tracking is running</string>
+    <string name="tracking_is_on">Tracking is running</string>
 </resources>
