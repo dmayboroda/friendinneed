@@ -46,4 +46,8 @@ public class GyroscopeDataSample extends DataSample {
     public void setGyroZ(float gyroZ) {
         this.gyroZ = gyroZ;
     }
+
+    public static GyroscopeDataSample fromDataSample(DataSample dataSample) {
+        return (GyroscopeDataSample) dataSample;
+    }
 }

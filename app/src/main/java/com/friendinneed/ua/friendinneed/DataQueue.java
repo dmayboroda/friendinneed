@@ -9,11 +9,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 class DataQueue {
     private static AtomicBoolean isDumping = new AtomicBoolean();
-    private static long timeout;
-    private static final LinkedList<DataSample> dataQueue = new LinkedList<>();
+    private long timeout;
+    private final LinkedList<DataSample> dataQueue = new LinkedList<>();
+    private final LinkedList<DataSample> dataQueueBuffer = new LinkedList<>();
 
     DataQueue(long timeout) {
-        DataQueue.timeout = timeout;
+        this.timeout = timeout;
         isDumping.set(false);
     }
 
@@ -26,10 +27,15 @@ class DataQueue {
 
     public void addSample(@NonNull final DataSample sample) {
         if (!isDumping.get()) {
+            while (dataQueueBuffer.size() != 0) {
+                dataQueue.addLast(dataQueueBuffer.removeFirst());
+            }
             dataQueue.addLast(sample);
             while (dataQueue.getFirst().getTimestamp() < (sample.getTimestamp() - timeout)) {
                 dataQueue.removeFirst();
             }
+        } else {
+            dataQueueBuffer.addLast(sample);
         }
     }
 

@@ -10,13 +10,13 @@ public class AccelerometerDataSample extends DataSample {
     @Expose
     private float accZ;
 
-    public AccelerometerDataSample(float accX, float accY, float accZ)
-    {
+    public AccelerometerDataSample(float accX, float accY, float accZ) {
         super();
         this.accX = accX;
         this.accY = accY;
         this.accZ = accZ;
     }
+
     public float getAccX() {
         return accX;
     }
@@ -44,5 +44,9 @@ public class AccelerometerDataSample extends DataSample {
     @Override
     public int getDataType() {
         return DATA_SAMPLE_TYPE_ACCELEROMETER;
+    }
+
+    public static AccelerometerDataSample fromDataSample(DataSample dataSample) {
+        return (AccelerometerDataSample) dataSample;
     }
 }
