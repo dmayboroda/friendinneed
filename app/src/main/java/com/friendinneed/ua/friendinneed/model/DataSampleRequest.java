@@ -20,8 +20,8 @@ public class DataSampleRequest {
     @Expose
     private Integer version;
 
-    public DataSampleRequest(DataSample[] dataSamples) {
-        label = 0;
+    public DataSampleRequest(DataSample[] dataSamples, Integer label) {
+        this.label = label;
         version = BuildConfig.VERSION_CODE;
         for (DataSample sample : dataSamples) {
             switch (sample.getDataType()) {

@@ -4,6 +4,7 @@ import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -16,9 +17,13 @@ import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.support.annotation.WorkerThread;
 import android.support.v4.app.NotificationCompat;
+import android.support.v7.app.AlertDialog;
+import android.support.v7.view.ContextThemeWrapper;
 import android.telephony.SmsManager;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Toast;
 
 import com.friendinneed.ua.friendinneed.model.AccelerometerDataSample;
@@ -35,6 +40,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import static com.friendinneed.ua.friendinneed.BuildConfig.DEBUG;
 import static java.lang.Math.sqrt;
 
 /**
@@ -42,6 +48,7 @@ import static java.lang.Math.sqrt;
  */
 public class InneedService extends Service implements SensorEventListener {
 
+    private static final boolean isCheckDialogVersion = true;
     private static final String TAG = InneedService.class.getSimpleName();
     private static final String ACTION_START = TAG + "_start";
     private static final String ACTION_STOP = TAG + "_stop";
@@ -57,23 +64,37 @@ public class InneedService extends Service implements SensorEventListener {
     private static final int PORT = 5000;
     private final OkHttpClient client = new OkHttpClient();
     private final DataQueue queue = new DataQueue(QUEUE_TIMEOUT_MILLIS);
-    private AsyncTask<Void, Void, Void> requestAsyncTask = getSendRequestTask();
+    private AsyncTask<Integer, Void, Void> requestAsyncTask = getSendRequestTask();
+    private DialogInterface.OnClickListener onSendClickListener = new DialogInterface.OnClickListener() {
+        public void onClick(DialogInterface dialog, int id) {
+            sendRequest(1);
+            //callForHelp();
+            dialog.dismiss();
+        }
+    };
+    private DialogInterface.OnClickListener onDiscardClickListener = new DialogInterface.OnClickListener() {
+        public void onClick(DialogInterface dialog, int id) {
+            sendRequest(0);
+            dialog.dismiss();
+        }
+    };
 
     private SensorManager mSensorManager;
     private Sensor mAccelerometerSensor;
     private Sensor mGyroSensor;
+    AlertDialog dialog;
 
     public InneedService() {
     }
 
-    private AsyncTask<Void, Void, Void> getSendRequestTask() {
-        return new AsyncTask<Void, Void, Void>() {
+    private AsyncTask<Integer, Void, Void> getSendRequestTask() {
+        return new AsyncTask<Integer, Void, Void>() {
             String response;
 
             @Override
-            protected Void doInBackground(Void... params) {
+            protected Void doInBackground(Integer... params) {
                 try {
-                    response = postDataQueueSamples(BASE_URL + ":" + PORT, queue.dump());
+                    response = postDataQueueSamples(BASE_URL + ":" + PORT, queue.dump(), params[0]);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -83,7 +104,11 @@ public class InneedService extends Service implements SensorEventListener {
             @Override
             protected void onPostExecute(Void aVoid) {
                 super.onPostExecute(aVoid);
-                Log.v(TAG, response);
+                if (response != null) {
+                    Log.v(TAG, response);
+                } else {
+                    Log.v(TAG, "no connection most probably");
+                }
             }
         };
     }
@@ -119,6 +144,7 @@ public class InneedService extends Service implements SensorEventListener {
     }
 
     private void start() {
+        dialog = getDialog();
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometerSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mGyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
@@ -167,8 +193,8 @@ public class InneedService extends Service implements SensorEventListener {
     private void calculate() {
     }
 
-    String postDataQueueSamples(String url, DataSample[] dataSamples) throws IOException {
-        DataSampleRequest dataSampleRequest = new DataSampleRequest(dataSamples);
+    String postDataQueueSamples(String url, DataSample[] dataSamples, Integer label) throws IOException {
+        DataSampleRequest dataSampleRequest = new DataSampleRequest(dataSamples, label);
         RequestBody body = RequestBody.create(JSON, new Gson().toJson(dataSampleRequest));
         Request request = new Request.Builder()
                 .url(url)
@@ -178,9 +204,25 @@ public class InneedService extends Service implements SensorEventListener {
         return response.body().string();
     }
 
-    void sendRequest() {
+    void sendRequest(int label) {
         requestAsyncTask = getSendRequestTask();
-        requestAsyncTask.execute();
+        requestAsyncTask.execute(label);
+    }
+
+    @Nullable
+    private AlertDialog getDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(new ContextThemeWrapper(this, R.style.alertDialog));
+        builder.setTitle(R.string.dialog_title);
+        builder.setPositiveButton(R.string.send, onSendClickListener);
+        builder.setNegativeButton(R.string.discard, onDiscardClickListener);
+        builder.setCancelable(false);
+        AlertDialog dialog = builder.create();
+        Window dialogWindow = dialog.getWindow();
+        if (dialogWindow != null) {
+            dialogWindow.setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+            return dialog;
+        }
+        return null;
     }
 
     @Override
@@ -192,11 +234,19 @@ public class InneedService extends Service implements SensorEventListener {
             accZ = event.values[2];
             final DataSample sampleAccelerometer = new AccelerometerDataSample(accX, accY, accZ);
             queue.addSample(sampleAccelerometer);
-            //Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
+            if (DEBUG) {
+                Log.d(TAG, "queue size: " + String.valueOf(queue.size()));
+            }
             if (requestAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
                 if (checkForJolt(accX, accY, accZ)) {
-                    //Log.v(TAG, "queue size: " + String.valueOf(queue.size()));
-                    sendRequest();
+                    //Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
+                    if (isCheckDialogVersion) {
+                        if (!dialog.isShowing()) {
+                            dialog.show();
+                        }
+                    } else {
+                        sendRequest(1); //always valid
+                    }
                 }
             }
         } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {

@@ -1,7 +1,10 @@
 package com.friendinneed.ua.friendinneed;
 
 import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
@@ -21,6 +24,24 @@ public class MainActivity extends AppCompatActivity
      */
     public static final String SERVICE_ACTION = MainActivity.class.getSimpleName() + "_service";
     Button manageContactsButton;
+    public final static int REQUEST_CODE = 5463 & 0xffffff00;
+
+    public void checkDrawOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, REQUEST_CODE);
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_CODE) {
+            startServiceIfPermissionGranted();
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,8 +85,19 @@ public class MainActivity extends AppCompatActivity
                 startActivity(intent);
             }
         });
-        InneedService.startInneedService(this);
+        startServiceIfPermissionGranted();
+    }
 
+    private void startServiceIfPermissionGranted() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                checkDrawOverlayPermission();
+            } else {
+                InneedService.startInneedService(this);
+            }
+        } else {
+            InneedService.startInneedService(this);
+        }
     }
 
     @Override
