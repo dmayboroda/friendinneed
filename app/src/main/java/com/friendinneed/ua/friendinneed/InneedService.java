@@ -1,39 +1,46 @@
 package com.friendinneed.ua.friendinneed;
 
+import android.Manifest;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Location;
+import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.IBinder;
 import android.os.Vibrator;
 import android.support.annotation.Nullable;
 import android.support.annotation.WorkerThread;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.view.ContextThemeWrapper;
 import android.telephony.SmsManager;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Toast;
 
 import com.friendinneed.ua.friendinneed.model.AccelerometerDataSample;
+import com.friendinneed.ua.friendinneed.model.Contact;
 import com.friendinneed.ua.friendinneed.model.DataSample;
 import com.friendinneed.ua.friendinneed.model.DataSampleRequest;
 import com.friendinneed.ua.friendinneed.model.GyroscopeDataSample;
 import com.google.gson.Gson;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -49,7 +56,8 @@ import static java.lang.Math.sqrt;
  */
 public class InneedService extends Service implements SensorEventListener {
 
-    private static final boolean isCheckDialogVersion = true;
+    private static final boolean isCheckDialogVersion = false;
+    private static AtomicBoolean isCheckingData = new AtomicBoolean();
     private static final String TAG = InneedService.class.getSimpleName();
     private static final String ACTION_START = TAG + "_start";
     private static final String ACTION_STOP = TAG + "_stop";
@@ -64,7 +72,7 @@ public class InneedService extends Service implements SensorEventListener {
     private static final String BASE_URL = "http://friendinneedserver6099.cloudapp.net";
     private static final String CHECK_FALL_ENDPOINT = "/check_fall";
     private static final int PORT = 5000;
-    private final OkHttpClient client = new OkHttpClient();
+    private OkHttpClient client;
     private final DataQueue queue = new DataQueue(QUEUE_TIMEOUT_MILLIS);
     private AsyncTask<Integer, Void, Void> requestSendAsyncTask = getSendDataTask();
     private AsyncTask<Void, Void, Void> requestCheckAsyncTask = getSendCheckDataTask();
@@ -88,6 +96,7 @@ public class InneedService extends Service implements SensorEventListener {
     Vibrator mVibrator;
 
     public InneedService() {
+        isCheckingData.set(false);
     }
 
     private AsyncTask<Integer, Void, Void> getSendDataTask() {
@@ -135,11 +144,13 @@ public class InneedService extends Service implements SensorEventListener {
                 super.onPostExecute(aVoid);
                 if (response != null) {
                     Log.v(TAG, response);
-                    //TODO: check server response and maybe call for help
-                    //callForHelp();
+                    if (Boolean.TRUE == Boolean.parseBoolean(response)) {
+                        callForHelp();
+                    }
                 } else {
                     Log.v(TAG, "no connection most probably");
                 }
+                isCheckingData.set(false);
             }
         };
     }
@@ -175,6 +186,9 @@ public class InneedService extends Service implements SensorEventListener {
     }
 
     private void start() {
+        OkHttpClient.Builder clientBuilder = new OkHttpClient.Builder();
+        clientBuilder.retryOnConnectionFailure(false);
+        client = clientBuilder.build();
         dialog = getDialog();
         mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -206,8 +220,8 @@ public class InneedService extends Service implements SensorEventListener {
     }
 
     private PendingIntent createIntent() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.setAction(MainActivity.SERVICE_ACTION);
+        Intent intent = new Intent(this, SettingsActivity.class);
+        intent.setAction(SettingsActivity.SERVICE_ACTION);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                 | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         return PendingIntent.getActivity(this, 0, intent, 0);
@@ -234,12 +248,14 @@ public class InneedService extends Service implements SensorEventListener {
                 .url(url)
                 .post(body)
                 .build();
+
         Response response = client.newCall(request).execute();
         return response.body().string();
     }
 
     void sendCheckRequest() {
         requestCheckAsyncTask = getSendCheckDataTask();
+        isCheckingData.set(true);
         requestCheckAsyncTask.execute();
     }
 
@@ -274,11 +290,11 @@ public class InneedService extends Service implements SensorEventListener {
             final DataSample sampleAccelerometer = new AccelerometerDataSample(accX, accY, accZ);
             queue.addSample(sampleAccelerometer);
             if (DEBUG) {
-                Log.d(TAG, "queue size: " + String.valueOf(queue.size()));
+                //    Log.d(TAG, "queue size: " + String.valueOf(queue.size()));
             }
             if (requestSendAsyncTask.getStatus() != AsyncTask.Status.RUNNING ||
                     requestCheckAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
-                if (checkForJolt(accX, accY, accZ)) {
+                if (!isCheckingData.get() && checkForJolt(accX, accY, accZ)) {
                     //Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
                     if (isCheckDialogVersion) {
                         if (!dialog.isShowing()) {
@@ -316,14 +332,27 @@ public class InneedService extends Service implements SensorEventListener {
     }
 
     private void callForHelp() {
-        try {
-            SmsManager smsManager = SmsManager.getDefault();
-            String phone = SharedPrefsUtils.getStringPreference(this, "contacts2");
-            smsManager.sendTextMessage(TextUtils.isEmpty(phone) ? "+380976673962" : phone, null, "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:50.4174038,30.474646", null, null);
-            Toast.makeText(getApplicationContext(), "SMS sent.", Toast.LENGTH_LONG).show();
-        } catch (Exception e) {
-            Toast.makeText(getApplicationContext(), "SMS failed, please try again.", Toast.LENGTH_LONG).show();
-            e.printStackTrace();
+        LocationManager locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            //TODO: do the permissions stuff
+            return;
+        }
+        Location location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        if (location != null) {
+            SmsManager sms = SmsManager.getDefault();
+            String message = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
+
+            ArrayList<Contact> contactsArray = SettingsActivity.getContactsListSharePref(this);
+            try {
+                for (Contact contact : contactsArray) {
+                    sms.sendTextMessage(contact.getContactNumber(), null, message, null, null);
+                }
+                Toast.makeText(getApplicationContext(), "SMS sent.", Toast.LENGTH_LONG).show();
+            } catch (Exception e) {
+                Toast.makeText(getApplicationContext(), "SMS failed, please try again.", Toast.LENGTH_LONG).show();
+                e.printStackTrace();
+            }
         }
     }
 

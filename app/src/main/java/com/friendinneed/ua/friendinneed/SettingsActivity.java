@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.provider.Settings;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SwitchCompat;
@@ -40,6 +41,7 @@ import java.util.List;
 
 public class SettingsActivity extends AppCompatActivity {
 
+    public static final String SERVICE_ACTION = SettingsActivity.class.getSimpleName() + "_service";
     private Boolean trackingStatus = false;
     private SharedPreferences prefs;
     private SwitchCompat trackingSwitch;
@@ -59,6 +61,8 @@ public class SettingsActivity extends AppCompatActivity {
     private static final String TRACKING_STATUS = "tracking_status";
     private static final String TIME_TO_WAIT = "time_to_wait";
     private static final int PERMISSIONS_REQUEST_READ_CONTACTS = 100;
+    public static final int PERMISSIONS_REQUEST_LOCATION = 200;
+    public static final int PERMISSIONS_REQUEST_SMS = 300;
     public final static int SYSTEM_ALERTS_REQUEST_CODE = 5463 & 0xffffff00;
 
     public void checkDrawOverlayPermission() {
@@ -118,7 +122,6 @@ public class SettingsActivity extends AppCompatActivity {
 
 
         trackingStatus = prefs.getBoolean(TRACKING_STATUS, false);
-        trackingSwitch.setChecked(trackingStatus);
 
         trackingSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -127,7 +130,7 @@ public class SettingsActivity extends AppCompatActivity {
                     trackingStatus = false;
                 }
                 if (isChecked) {
-                    startServiceIfPermissionGranted();
+                    startServiceIfPermissionsGranted();
                     trackingSwitchTextView.setText(getResources().getString(R.string.tracking_is_running));
                 } else {
                     InneedService.stopInnedService(SettingsActivity.this);
@@ -141,6 +144,8 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         contactsAddedListView = (ListView) findViewById(R.id.contacts_added_list);
+        trackingSwitch.setChecked(trackingStatus);
+
         contactArrayList = getContactsListSharePref(this);
         if (contactArrayList == null) {
             contactArrayList = new ArrayList<>();
@@ -225,22 +230,45 @@ public class SettingsActivity extends AppCompatActivity {
                     saveContactsListSharePref(this, contactArrayList);
                 }
             case (SYSTEM_ALERTS_REQUEST_CODE):
-                startServiceIfPermissionGranted();
+            case (PERMISSIONS_REQUEST_LOCATION):
+            case (PERMISSIONS_REQUEST_SMS):
+                startServiceIfPermissionsGranted();
             default:
                 //nothn
         }
     }
 
-    private void startServiceIfPermissionGranted() {
+    private void startServiceIfPermissionsGranted() {
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                    checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                        },
+                        SettingsActivity.PERMISSIONS_REQUEST_LOCATION);
+                return;
+            }
+            if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{
+                                Manifest.permission.SEND_SMS
+                        },
+                        SettingsActivity.PERMISSIONS_REQUEST_SMS);
+                return;
+            }
             if (!Settings.canDrawOverlays(this)) {
                 checkDrawOverlayPermission();
-            } else {
-                InneedService.startInneedService(this);
+                return;
             }
-        } else {
-            InneedService.startInneedService(this);
         }
+        InneedService.startInneedService(this);
     }
 
     public void readContact() {
@@ -267,7 +295,7 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
 
-    public ArrayList<Contact> getContactsListSharePref(Context context) {
+    public static ArrayList<Contact> getContactsListSharePref(Context context) {
         List<Contact> sharedContactList = new ArrayList<>();
 
         SharedPreferences sharedPreferences = context.getSharedPreferences(SHARED_PREFS_NAME,
