@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
+import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SwitchCompat;
 import android.view.View;
@@ -54,6 +55,17 @@ public class SettingsActivity extends AppCompatActivity {
     private static final String TRACKING_STATUS = "tracking_status";
     private static final String TIME_TO_WAIT = "time_to_wait";
     private static final int PERMISSIONS_REQUEST_READ_CONTACTS = 100;
+    public final static int SYSTEM_ALERTS_REQUEST_CODE = 5463 & 0xffffff00;
+
+    public void checkDrawOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, SYSTEM_ALERTS_REQUEST_CODE);
+            }
+        }
+    }
 
     private Contact contact;
     private ArrayList<Contact> contactArrayList;
@@ -83,7 +95,7 @@ public class SettingsActivity extends AppCompatActivity {
         trackingSwitch = (SwitchCompat) findViewById(R.id.tracking_switch);
         numberPicker = (NumberPicker) findViewById(R.id.numb_picker_settings);
         numberPicker.setWrapSelectorWheel(false);
-            timeToWait = prefs.getInt(TIME_TO_WAIT, 15);
+        timeToWait = prefs.getInt(TIME_TO_WAIT, 15);
 
         numberPicker.setTag(timeToWait);
         numberPicker.setValue(timeToWait);
@@ -107,11 +119,13 @@ public class SettingsActivity extends AppCompatActivity {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (trackingStatus) {
                     trackingStatus = false;
-                    if (isChecked) {
-                        trackingSwitchTextView.setText(getResources().getString(R.string.tracking_is_running));
-                    } else {
-                        trackingSwitchTextView.setText(getResources().getString(R.string.turn_on_tracking));
-                    }
+                }
+                if (isChecked) {
+                    startServiceIfPermissionGranted();
+                    trackingSwitchTextView.setText(getResources().getString(R.string.tracking_is_running));
+                } else {
+                    InneedService.stopInnedService(SettingsActivity.this);
+                    trackingSwitchTextView.setText(getResources().getString(R.string.turn_on_tracking));
                 }
                 trackingStatus = isChecked;
                 SharedPreferences.Editor editor = prefs.edit();
@@ -121,7 +135,7 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         contactArrayList = getContactsListSharePref(this);
-        if(contactArrayList == null) {
+        if (contactArrayList == null) {
             contactArrayList = new ArrayList<>();
         }
         contactListAdapter = new ContactListAdapter(this, R.layout.contact_list_item, contactArrayList);
@@ -143,14 +157,11 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
 
-
     @Override
     protected void onStop() {
         super.onStop();
-            saveContactsListSharePref(this, contactArrayList);
+        saveContactsListSharePref(this, contactArrayList);
     }
-
-
 
 
     @TargetApi(Build.VERSION_CODES.KITKAT)
@@ -190,6 +201,22 @@ public class SettingsActivity extends AppCompatActivity {
 
                     saveContactsListSharePref(this, contactArrayList);
                 }
+            case (SYSTEM_ALERTS_REQUEST_CODE):
+                startServiceIfPermissionGranted();
+            default:
+                //nothn
+        }
+    }
+
+    private void startServiceIfPermissionGranted() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                checkDrawOverlayPermission();
+            } else {
+                InneedService.startInneedService(this);
+            }
+        } else {
+            InneedService.startInneedService(this);
         }
     }
 
@@ -202,18 +229,16 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
 
-
-
     public void saveContactsListSharePref(Context context, List<Contact> contactListToShare) {
 
-            SharedPreferences sharedPreferences = context.getSharedPreferences(SHARED_PREFS_NAME,
-    				Context.MODE_PRIVATE);
-    		SharedPreferences.Editor editor = sharedPreferences.edit();
-    		Gson gson = new Gson();
-    		String jsonContacts = gson.toJson(contactListToShare);
-    		editor.putString(CONTACTS, jsonContacts);
-    		editor.commit();
-    	}
+        SharedPreferences sharedPreferences = context.getSharedPreferences(SHARED_PREFS_NAME,
+                Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        Gson gson = new Gson();
+        String jsonContacts = gson.toJson(contactListToShare);
+        editor.putString(CONTACTS, jsonContacts);
+        editor.commit();
+    }
 
 
     public ArrayList<Contact> getContactsListSharePref(Context context) {
@@ -231,7 +256,7 @@ public class SettingsActivity extends AppCompatActivity {
             sharedContactList = Arrays.asList(contactsArray);
             sharedContactList = new ArrayList<>(sharedContactList);
         } else
-    		return (ArrayList<Contact>) sharedContactList;
+            return (ArrayList<Contact>) sharedContactList;
 
         return (ArrayList<Contact>) sharedContactList;
     }

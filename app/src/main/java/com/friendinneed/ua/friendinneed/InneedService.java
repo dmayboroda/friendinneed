@@ -14,6 +14,7 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.AsyncTask;
 import android.os.IBinder;
+import android.os.Vibrator;
 import android.support.annotation.Nullable;
 import android.support.annotation.WorkerThread;
 import android.support.v4.app.NotificationCompat;
@@ -61,20 +62,21 @@ public class InneedService extends Service implements SensorEventListener {
 
     public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final String BASE_URL = "http://friendinneedserver6099.cloudapp.net";
+    private static final String CHECK_FALL_ENDPOINT = "/check_fall";
     private static final int PORT = 5000;
     private final OkHttpClient client = new OkHttpClient();
     private final DataQueue queue = new DataQueue(QUEUE_TIMEOUT_MILLIS);
-    private AsyncTask<Integer, Void, Void> requestAsyncTask = getSendRequestTask();
+    private AsyncTask<Integer, Void, Void> requestSendAsyncTask = getSendDataTask();
+    private AsyncTask<Void, Void, Void> requestCheckAsyncTask = getSendCheckDataTask();
     private DialogInterface.OnClickListener onSendClickListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
-            sendRequest(1);
-            //callForHelp();
+            sendDataRequest(1);
             dialog.dismiss();
         }
     };
     private DialogInterface.OnClickListener onDiscardClickListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
-            sendRequest(0);
+            sendDataRequest(0);
             dialog.dismiss();
         }
     };
@@ -83,11 +85,12 @@ public class InneedService extends Service implements SensorEventListener {
     private Sensor mAccelerometerSensor;
     private Sensor mGyroSensor;
     AlertDialog dialog;
+    Vibrator mVibrator;
 
     public InneedService() {
     }
 
-    private AsyncTask<Integer, Void, Void> getSendRequestTask() {
+    private AsyncTask<Integer, Void, Void> getSendDataTask() {
         return new AsyncTask<Integer, Void, Void>() {
             String response;
 
@@ -106,6 +109,34 @@ public class InneedService extends Service implements SensorEventListener {
                 super.onPostExecute(aVoid);
                 if (response != null) {
                     Log.v(TAG, response);
+                } else {
+                    Log.v(TAG, "no connection most probably");
+                }
+            }
+        };
+    }
+
+    private AsyncTask<Void, Void, Void> getSendCheckDataTask() {
+        return new AsyncTask<Void, Void, Void>() {
+            String response;
+
+            @Override
+            protected Void doInBackground(Void... params) {
+                try {
+                    response = postDataQueueSamples(BASE_URL + ":" + PORT + CHECK_FALL_ENDPOINT, queue.dump(), 0); //label does not matter here
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }
+
+            @Override
+            protected void onPostExecute(Void aVoid) {
+                super.onPostExecute(aVoid);
+                if (response != null) {
+                    Log.v(TAG, response);
+                    //TODO: check server response and maybe call for help
+                    //callForHelp();
                 } else {
                     Log.v(TAG, "no connection most probably");
                 }
@@ -145,6 +176,7 @@ public class InneedService extends Service implements SensorEventListener {
 
     private void start() {
         dialog = getDialog();
+        mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometerSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mGyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
@@ -155,8 +187,10 @@ public class InneedService extends Service implements SensorEventListener {
     }
 
     private void stop() {
-        mSensorManager.unregisterListener(this, mAccelerometerSensor);
-        mSensorManager.unregisterListener(this, mGyroSensor);
+        if (mAccelerometerSensor != null && mGyroSensor != null) {
+            mSensorManager.unregisterListener(this, mAccelerometerSensor);
+            mSensorManager.unregisterListener(this, mGyroSensor);
+        }
         stopForeground(true);
         stopSelf();
     }
@@ -204,9 +238,14 @@ public class InneedService extends Service implements SensorEventListener {
         return response.body().string();
     }
 
-    void sendRequest(int label) {
-        requestAsyncTask = getSendRequestTask();
-        requestAsyncTask.execute(label);
+    void sendCheckRequest() {
+        requestCheckAsyncTask = getSendCheckDataTask();
+        requestCheckAsyncTask.execute();
+    }
+
+    void sendDataRequest(int label) {
+        requestSendAsyncTask = getSendDataTask();
+        requestSendAsyncTask.execute(label);
     }
 
     @Nullable
@@ -237,15 +276,17 @@ public class InneedService extends Service implements SensorEventListener {
             if (DEBUG) {
                 Log.d(TAG, "queue size: " + String.valueOf(queue.size()));
             }
-            if (requestAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
+            if (requestSendAsyncTask.getStatus() != AsyncTask.Status.RUNNING ||
+                    requestCheckAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
                 if (checkForJolt(accX, accY, accZ)) {
                     //Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
                     if (isCheckDialogVersion) {
                         if (!dialog.isShowing()) {
                             dialog.show();
+                            mVibrator.vibrate(800);
                         }
                     } else {
-                        sendRequest(1); //always valid
+                        sendCheckRequest();
                     }
                 }
             }
