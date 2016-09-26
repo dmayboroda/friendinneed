@@ -198,7 +198,7 @@ public class InneedService extends Service implements SensorEventListener {
     private Notification createNotification() {
         return new NotificationCompat.Builder(this)
                 .setContentTitle(getString(R.string.app_name))
-                .setSmallIcon(R.drawable.app_icon)
+                .setSmallIcon(R.drawable.ic_notif)
                 .setLargeIcon(createBitmap())
                 .setContentIntent(createIntent())
                 .setOngoing(true)
@@ -216,7 +216,7 @@ public class InneedService extends Service implements SensorEventListener {
     @WorkerThread
     private Bitmap createBitmap() {
         Bitmap bitmap = BitmapFactory.decodeResource
-                (getResources(), R.drawable.app_icon);
+                (getResources(), R.drawable.ic_notif);
         return Bitmap.createScaledBitmap(bitmap, 128, 128, false);
     }
 
