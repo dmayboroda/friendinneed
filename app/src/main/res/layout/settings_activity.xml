@@ -1,25 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-<!--<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"-->
-    <!--android:layout_height="wrap_content"-->
-    <!--android:layout_width="match_parent"-->
-    <!--&gt;-->
-
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="15dp">
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="7dp"
+        android:paddingBottom="7dp">
+
+        <TextView
+            android:id="@+id/tracking_switch_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="left"
+            android:textColor="@android:color/black"
+            android:text="@string/turn_on_tracking"
+            android:textSize="17sp"/>
+
+        <android.support.v7.widget.SwitchCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/tracking_switch"/>
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@android:color/darker_gray"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="10dp"/>
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/contacts_tv"
         android:text="@string/emergency_contacts"
-        android:textSize="@dimen/activity_horizontal_margin"
+        android:textColor="@android:color/black"
+        android:textSize="17sp"
         android:paddingBottom="10dp"/>
 
-        <ListView
+    <ListView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="100dp"
@@ -43,35 +68,6 @@
         android:layout_marginBottom="10dp"/>
 
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp">
-
-        <TextView
-            android:id="@+id/tracking_switch_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="left"
-            android:text="@string/turn_on_tracking"
-            android:textSize="@dimen/activity_horizontal_margin"/>
-
-        <android.support.v7.widget.SwitchCompat
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:id="@+id/tracking_switch"/>
-
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@android:color/darker_gray"
-        android:layout_marginTop="10dp"
-        android:layout_marginBottom="10dp"/>
-
-    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -83,7 +79,8 @@
             android:layout_weight="6"
             android:layout_gravity="center_vertical"
             android:text="@string/number_picker_settings_text"
-            android:textSize="@dimen/activity_horizontal_margin"/>
+            android:textColor="@android:color/black"
+            android:textSize="17sp"/>
 
         <NumberPicker
             android:layout_width="100dp"
@@ -96,4 +93,3 @@
     </LinearLayout>
 
 </LinearLayout>
-<!--</ScrollView>-->

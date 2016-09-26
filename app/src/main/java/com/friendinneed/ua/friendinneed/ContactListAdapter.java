@@ -48,7 +48,7 @@ public class ContactListAdapter extends ArrayAdapter<Contact> {
                 .openContactPhotoInputStream(getContext().getContentResolver(), getItem(position).getImageUri());
         Bitmap contactPhotoImage;
         if (input == null) {
-            contactPhotoImage = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.default_contact_photo);
+            contactPhotoImage = BitmapFactory.decodeResource(getContext().getResources(), R.drawable.app_icon);
         } else {
             contactPhotoImage = BitmapFactory.decodeStream(input);
         }

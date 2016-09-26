@@ -5,6 +5,7 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -14,14 +15,17 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.provider.Settings;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SwitchCompat;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.ListView;
 import android.widget.NumberPicker;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.friendinneed.ua.friendinneed.model.Contact;
 import com.google.gson.Gson;
@@ -88,14 +92,13 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
-        contactsAddedListView = (ListView) findViewById(R.id.contacts_added_list);
 
 
         trackingSwitchTextView = (TextView) findViewById(R.id.tracking_switch_text);
         trackingSwitch = (SwitchCompat) findViewById(R.id.tracking_switch);
         numberPicker = (NumberPicker) findViewById(R.id.numb_picker_settings);
         numberPicker.setWrapSelectorWheel(false);
-        timeToWait = prefs.getInt(TIME_TO_WAIT, 15);
+            timeToWait = prefs.getInt(TIME_TO_WAIT, defaultTimeToWait);
 
         numberPicker.setTag(timeToWait);
         numberPicker.setValue(timeToWait);
@@ -110,6 +113,9 @@ public class SettingsActivity extends AppCompatActivity {
         });
         numberPicker.setMinValue(0);
         numberPicker.setMaxValue(60);
+        numberPicker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+
+
 
         trackingStatus = prefs.getBoolean(TRACKING_STATUS, false);
         trackingSwitch.setChecked(trackingStatus);
@@ -134,12 +140,31 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
+        contactsAddedListView = (ListView) findViewById(R.id.contacts_added_list);
         contactArrayList = getContactsListSharePref(this);
         if (contactArrayList == null) {
             contactArrayList = new ArrayList<>();
         }
         contactListAdapter = new ContactListAdapter(this, R.layout.contact_list_item, contactArrayList);
         contactsAddedListView.setAdapter(contactListAdapter);
+        contactsAddedListView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(SettingsActivity.this);
+                builder.setMessage(getString(R.string.delete_contact_txt));
+                builder.setPositiveButton(getString(R.string.yes_txt), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        contactArrayList.remove(position);
+                        contactListAdapter.notifyDataSetChanged();
+                    }
+                });
+                builder.setNegativeButton(getString(R.string.no_txt), null);
+                builder.show();
+
+                return true;
+            }
+        });
     }
 
     @Override
@@ -149,9 +174,7 @@ public class SettingsActivity extends AppCompatActivity {
         trackingStatus = prefs.getBoolean(TRACKING_STATUS, false);
         trackingSwitch.setChecked(trackingStatus);
 
-
-        timeToWait = prefs.getInt(TIME_TO_WAIT, 15);
-
+        timeToWait = prefs.getInt(TIME_TO_WAIT, defaultTimeToWait);
         numberPicker.setTag(timeToWait);
         numberPicker.setValue(timeToWait);
     }
@@ -221,9 +244,12 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     public void readContact() {
-        Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
-        startActivityForResult(intent, PICK_CONTACT);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
+            startActivityForResult(intent, PICK_CONTACT);
+        }
+        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, PERMISSIONS_REQUEST_READ_CONTACTS);
         }
     }
@@ -259,6 +285,26 @@ public class SettingsActivity extends AppCompatActivity {
             return (ArrayList<Contact>) sharedContactList;
 
         return (ArrayList<Contact>) sharedContactList;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        switch (requestCode) {
+            case PERMISSIONS_REQUEST_READ_CONTACTS:
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // Permission Granted
+                    Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
+                    startActivityForResult(intent, PICK_CONTACT);
+                } else {
+                    // Permission Denied
+                    Toast.makeText(SettingsActivity.this, R.string.contacts_perm_accept, Toast.LENGTH_SHORT)
+                            .show();
+                }
+                break;
+            default:
+                super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
+
     }
 
 }
