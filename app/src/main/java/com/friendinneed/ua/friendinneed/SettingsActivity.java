@@ -47,19 +47,16 @@ public class SettingsActivity extends AppCompatActivity {
     private SwitchCompat trackingSwitch;
     private TextView trackingSwitchTextView;
     private NumberPicker numberPicker;
-    private Button addContactBtn;
     final int PICK_CONTACT = 1;
-    private String name;
     private String phoneNumber;
-    private ListView contactsAddedListView;
     private ContactListAdapter contactListAdapter;
     private static final int defaultTimeToWait = 15;
     private int timeToWait;
 
-    private static final String SHARED_PREFS_NAME = "AddedContactsListShared";
-    private static final String CONTACTS = "contacts";
-    private static final String TRACKING_STATUS = "tracking_status";
-    private static final String TIME_TO_WAIT = "time_to_wait";
+    public static final String SHARED_PREFS_NAME = "frieninneed";
+    public static final String CONTACTS = "contacts";
+    public static final String TRACKING_STATUS = "tracking_status";
+    public static final String TIME_TO_WAIT = "time_to_wait";
     private static final int PERMISSIONS_REQUEST_READ_CONTACTS = 100;
     public static final int PERMISSIONS_REQUEST_LOCATION = 200;
     public static final int PERMISSIONS_REQUEST_SMS = 300;
@@ -75,7 +72,6 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
-    private Contact contact;
     private ArrayList<Contact> contactArrayList;
 
     @Override
@@ -88,7 +84,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         contactArrayList = new ArrayList<>();
 
-        addContactBtn = (Button) findViewById(R.id.add_contact_btn);
+        Button addContactBtn = (Button) findViewById(R.id.add_contact_btn);
         addContactBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -143,7 +139,7 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
 
-        contactsAddedListView = (ListView) findViewById(R.id.contacts_added_list);
+        ListView contactsAddedListView = (ListView) findViewById(R.id.contacts_added_list);
         trackingSwitch.setChecked(trackingStatus);
 
         contactArrayList = getContactsListSharePref(this);
@@ -205,7 +201,7 @@ public class SettingsActivity extends AppCompatActivity {
                     cursor.moveToFirst();
                     ContentResolver cr = getContentResolver();
                     String contactID = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));
-                    name = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
+                    String name = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
 
                     // get phone number
                     if (Integer.parseInt(cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
@@ -220,7 +216,7 @@ public class SettingsActivity extends AppCompatActivity {
                         pCur.close();
                     }
 
-                    contact = new Contact(name, phoneNumber, uri);
+                    Contact contact = new Contact(name, phoneNumber, uri);
                     if (contactArrayList == null) {
                         contactArrayList = new ArrayList<>();
                     }

@@ -14,9 +14,12 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.hardware.TriggerEvent;
+import android.hardware.TriggerEventListener;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.AsyncTask;
+import android.os.CountDownTimer;
 import android.os.IBinder;
 import android.os.Vibrator;
 import android.support.annotation.Nullable;
@@ -57,6 +60,7 @@ import static java.lang.Math.sqrt;
 public class InneedService extends Service implements SensorEventListener {
 
     private static final boolean isCheckDialogVersion = false;
+    public static final int MILLIS_IN_SECOND = 1000;
     private static AtomicBoolean isCheckingData = new AtomicBoolean();
     private static final String TAG = InneedService.class.getSimpleName();
     private static final String ACTION_START = TAG + "_start";
@@ -67,6 +71,7 @@ public class InneedService extends Service implements SensorEventListener {
     private static final double G_POINT = 1.8 * 9.8;
     private static final double EPSILON = 0.0;
     private static final int QUEUE_TIMEOUT_MILLIS = 2000;
+    private static final int DEFAULT_WAIT_TIME = 15;
 
     public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final String BASE_URL = "http://friendinneedserver6099.cloudapp.net";
@@ -76,6 +81,7 @@ public class InneedService extends Service implements SensorEventListener {
     private final DataQueue queue = new DataQueue(QUEUE_TIMEOUT_MILLIS);
     private AsyncTask<Integer, Void, Void> requestSendAsyncTask = getSendDataTask();
     private AsyncTask<Void, Void, Void> requestCheckAsyncTask = getSendCheckDataTask();
+
     private DialogInterface.OnClickListener onSendClickListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
             sendDataRequest(1);
@@ -88,71 +94,26 @@ public class InneedService extends Service implements SensorEventListener {
             dialog.dismiss();
         }
     };
+    private TriggerEventListener mTriggerEventListener = new TriggerEventListener() {
+        @Override
+        public void onTrigger(TriggerEvent event) {
+            if (inactivityFirstTimer != null) {
+                inactivityFirstTimer.cancel();
+            }
+        }
+    };
 
     private SensorManager mSensorManager;
     private Sensor mAccelerometerSensor;
     private Sensor mGyroSensor;
+    private Sensor mSignificantMotionSensor;
     AlertDialog dialog;
     Vibrator mVibrator;
+    private CountDownTimer inactivityFirstTimer;
+
 
     public InneedService() {
         isCheckingData.set(false);
-    }
-
-    private AsyncTask<Integer, Void, Void> getSendDataTask() {
-        return new AsyncTask<Integer, Void, Void>() {
-            String response;
-
-            @Override
-            protected Void doInBackground(Integer... params) {
-                try {
-                    response = postDataQueueSamples(BASE_URL + ":" + PORT, queue.dump(), params[0]);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                return null;
-            }
-
-            @Override
-            protected void onPostExecute(Void aVoid) {
-                super.onPostExecute(aVoid);
-                if (response != null) {
-                    Log.v(TAG, response);
-                } else {
-                    Log.v(TAG, "no connection most probably");
-                }
-            }
-        };
-    }
-
-    private AsyncTask<Void, Void, Void> getSendCheckDataTask() {
-        return new AsyncTask<Void, Void, Void>() {
-            String response;
-
-            @Override
-            protected Void doInBackground(Void... params) {
-                try {
-                    response = postDataQueueSamples(BASE_URL + ":" + PORT + CHECK_FALL_ENDPOINT, queue.dump(), 0); //label does not matter here
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                return null;
-            }
-
-            @Override
-            protected void onPostExecute(Void aVoid) {
-                super.onPostExecute(aVoid);
-                if (response != null) {
-                    Log.v(TAG, response);
-                    if (Boolean.TRUE == Boolean.parseBoolean(response)) {
-                        callForHelp();
-                    }
-                } else {
-                    Log.v(TAG, "no connection most probably");
-                }
-                isCheckingData.set(false);
-            }
-        };
     }
 
     public static void startInneedService(Context context) {
@@ -194,6 +155,7 @@ public class InneedService extends Service implements SensorEventListener {
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometerSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mGyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        mSignificantMotionSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_SIGNIFICANT_MOTION);
         mSensorManager.registerListener(this, mAccelerometerSensor, SensorManager.SENSOR_DELAY_FASTEST);
         mSensorManager.registerListener(this, mGyroSensor, SensorManager.SENSOR_DELAY_FASTEST);
         startForeground(SERVICE_ID, createNotification());
@@ -302,7 +264,8 @@ public class InneedService extends Service implements SensorEventListener {
                             mVibrator.vibrate(800);
                         }
                     } else {
-                        sendCheckRequest();
+                        fallMaybeHappen();
+
                     }
                 }
             }
@@ -324,6 +287,26 @@ public class InneedService extends Service implements SensorEventListener {
             final DataSample sampleGyroscope = new GyroscopeDataSample(gyroX, gyroY, gyroZ);
             queue.addSample(sampleGyroscope);
         }
+    }
+
+    private void fallMaybeHappen() {
+        inactivityFirstTimer = new CountDownTimer(getSharedPreferences(
+                SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
+                getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
+                MILLIS_IN_SECOND) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                Log.d(TAG, "inactivityFirstTimer is ticking: " +
+                        (millisUntilFinished/MILLIS_IN_SECOND));
+            }
+
+            @Override
+            public void onFinish() {
+                sendCheckRequest();
+            }
+        }.start();
+
+        mSensorManager.requestTriggerSensor(mTriggerEventListener, mSignificantMotionSensor);
     }
 
     @Override
@@ -361,4 +344,61 @@ public class InneedService extends Service implements SensorEventListener {
         double checkVar = Math.sqrt(Double.parseDouble(Float.toString(sum)));
         return (checkVar > G_POINT);
     }
+
+    private AsyncTask<Integer, Void, Void> getSendDataTask() {
+        return new AsyncTask<Integer, Void, Void>() {
+            String response;
+
+            @Override
+            protected Void doInBackground(Integer... params) {
+                try {
+                    response = postDataQueueSamples(BASE_URL + ":" + PORT, queue.dump(), params[0]);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }
+
+            @Override
+            protected void onPostExecute(Void aVoid) {
+                super.onPostExecute(aVoid);
+                if (response != null) {
+                    Log.v(TAG, response);
+                } else {
+                    Log.v(TAG, "no connection most probably");
+                }
+            }
+        };
+    }
+
+    private AsyncTask<Void, Void, Void> getSendCheckDataTask() {
+        return new AsyncTask<Void, Void, Void>() {
+            String response;
+
+            @Override
+            protected Void doInBackground(Void... params) {
+                try {
+                    response = postDataQueueSamples(BASE_URL + ":" + PORT + CHECK_FALL_ENDPOINT, queue.dump(), 0); //label does not matter here
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }
+
+            @Override
+            protected void onPostExecute(Void aVoid) {
+                super.onPostExecute(aVoid);
+                if (response != null) {
+                    Log.v(TAG, response);
+                    if (Boolean.TRUE == Boolean.parseBoolean(response)) {
+                        callForHelp();
+                    }
+                } else {
+                    Log.v(TAG, "no connection most probably");
+                }
+                isCheckingData.set(false);
+            }
+        };
+    }
+
 }
