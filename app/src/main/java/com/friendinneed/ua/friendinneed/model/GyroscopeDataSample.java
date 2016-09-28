@@ -50,4 +50,9 @@ public class GyroscopeDataSample extends DataSample {
     public static GyroscopeDataSample fromDataSample(DataSample dataSample) {
         return (GyroscopeDataSample) dataSample;
     }
+
+    @Override
+    public String toString() {
+        return "gyroX=" + gyroX + ", gyroY=" + gyroY + ", gyroZ=" + gyroZ;
+    }
 }

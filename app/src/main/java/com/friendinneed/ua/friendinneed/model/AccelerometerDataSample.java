@@ -49,4 +49,9 @@ public class AccelerometerDataSample extends DataSample {
     public static AccelerometerDataSample fromDataSample(DataSample dataSample) {
         return (AccelerometerDataSample) dataSample;
     }
+
+    @Override
+    public String toString() {
+        return "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ;
+    }
 }
