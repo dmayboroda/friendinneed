@@ -12,7 +12,15 @@ android {
         versionName "1.0"
     }
     buildTypes {
+        Properties localProperties = new Properties()
+        localProperties.load(project.rootProject.file('local.properties').newDataInputStream())
+        def apiKey = localProperties.getProperty('api.key')
+
+        debug {
+            resValue "string", "api_key", apiKey
+        }
         release {
+            resValue "string", "api_key", apiKey
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -26,4 +34,5 @@ dependencies {
     compile 'com.android.support:design:23.1.1'
     compile 'com.squareup.okhttp3:okhttp:3.2.0'
     compile 'com.google.code.gson:gson:2.2.4'
+    compile 'com.google.android.gms:play-services-contextmanager:9.4.0'
 }

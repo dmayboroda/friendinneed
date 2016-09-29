@@ -7,6 +7,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -19,9 +20,11 @@ import android.hardware.TriggerEventListener;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.AsyncTask;
+import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.IBinder;
 import android.os.Vibrator;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.WorkerThread;
 import android.support.v4.app.ActivityCompat;
@@ -39,6 +42,13 @@ import com.friendinneed.ua.friendinneed.model.Contact;
 import com.friendinneed.ua.friendinneed.model.DataSample;
 import com.friendinneed.ua.friendinneed.model.DataSampleRequest;
 import com.friendinneed.ua.friendinneed.model.GyroscopeDataSample;
+import com.google.android.gms.awareness.Awareness;
+import com.google.android.gms.awareness.fence.AwarenessFence;
+import com.google.android.gms.awareness.fence.DetectedActivityFence;
+import com.google.android.gms.awareness.fence.FenceUpdateRequest;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
 import com.google.gson.Gson;
 
 import java.io.IOException;
@@ -57,14 +67,23 @@ import static java.lang.Math.sqrt;
 /**
  * Created by Mayboroda on 8/30/16.
  */
-public class InneedService extends Service implements SensorEventListener {
+public class InneedService extends Service implements SensorEventListener, GoogleApiClient.ConnectionCallbacks {
 
+    private GoogleApiClient mGoogleApiClient;
     private static final boolean isCheckDialogVersion = false;
     public static final int MILLIS_IN_SECOND = 1000;
-    private static AtomicBoolean isCheckingData = new AtomicBoolean();
+    private static AtomicBoolean isCheckingData = new AtomicBoolean(false);
+    private static AtomicBoolean isDetecting = new AtomicBoolean(false);
     private static final String TAG = InneedService.class.getSimpleName();
     private static final String ACTION_START = TAG + "_start";
     private static final String ACTION_STOP = TAG + "_stop";
+    private static final String ACTION_START_DETECTION = TAG + "_start_detection";
+    private static final String ACTION_STOP_DETECTION = TAG + "_stop_detection";
+
+    public static final String FENCE_RECEIVER_ACTION =
+            BuildConfig.APPLICATION_ID + ".FENCE_RECEIVER_ACTION";
+
+    public static final String START_FENCE_KEY = "start_fence_key";
 
     private static final int SERVICE_ID = 0110;
 
@@ -81,6 +100,7 @@ public class InneedService extends Service implements SensorEventListener {
     private final DataQueue queue = new DataQueue(QUEUE_TIMEOUT_MILLIS);
     private AsyncTask<Integer, Void, Void> requestSendAsyncTask = getSendDataTask();
     private AsyncTask<Void, Void, Void> requestCheckAsyncTask = getSendCheckDataTask();
+    private StillStateReceiver mFenceReceiver;
 
     private DialogInterface.OnClickListener onSendClickListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
@@ -97,6 +117,7 @@ public class InneedService extends Service implements SensorEventListener {
     private TriggerEventListener mTriggerEventListener = new TriggerEventListener() {
         @Override
         public void onTrigger(TriggerEvent event) {
+            resumeInnedService(getApplicationContext());
             if (inactivityFirstTimer != null) {
                 inactivityFirstTimer.cancel();
             }
@@ -113,7 +134,6 @@ public class InneedService extends Service implements SensorEventListener {
 
 
     public InneedService() {
-        isCheckingData.set(false);
     }
 
     public static void startInneedService(Context context) {
@@ -128,6 +148,18 @@ public class InneedService extends Service implements SensorEventListener {
         context.startService(intent);
     }
 
+    public static void suspendInnedService(Context context) {
+        Intent intent = new Intent(context, InneedService.class);
+        intent.setAction(ACTION_STOP_DETECTION);
+        context.startService(intent);
+    }
+
+    public static void resumeInnedService(Context context) {
+        Intent intent = new Intent(context, InneedService.class);
+        intent.setAction(ACTION_START_DETECTION);
+        context.startService(intent);
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (null != intent) {
@@ -135,6 +167,10 @@ public class InneedService extends Service implements SensorEventListener {
                 start();
             } else if (intent.getAction().equals(ACTION_STOP)) {
                 stop();
+            } else if (intent.getAction().equals(ACTION_START_DETECTION)) {
+                startDetection();
+            } else if (intent.getAction().equals(ACTION_STOP_DETECTION)) {
+                stopDetection();
             }
         }
         return START_STICKY;
@@ -147,6 +183,10 @@ public class InneedService extends Service implements SensorEventListener {
     }
 
     private void start() {
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(Awareness.API)
+                .addConnectionCallbacks(this)
+                .build();
         OkHttpClient.Builder clientBuilder = new OkHttpClient.Builder();
         clientBuilder.retryOnConnectionFailure(false);
         client = clientBuilder.build();
@@ -156,17 +196,55 @@ public class InneedService extends Service implements SensorEventListener {
         mAccelerometerSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mGyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         mSignificantMotionSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_SIGNIFICANT_MOTION);
-        mSensorManager.registerListener(this, mAccelerometerSensor, SensorManager.SENSOR_DELAY_FASTEST);
-        mSensorManager.registerListener(this, mGyroSensor, SensorManager.SENSOR_DELAY_FASTEST);
+        startDetection();
         startForeground(SERVICE_ID, createNotification());
         calculate();
     }
 
-    private void stop() {
+    private void startDetection() {
+        if (isDetecting.get()) {
+            return;
+        }
+        mGoogleApiClient.connect();
+        mSensorManager.registerListener(this, mAccelerometerSensor, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, mGyroSensor, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.requestTriggerSensor(mTriggerEventListener, mSignificantMotionSensor);
+        isDetecting.set(true);
+    }
+
+    private void stopDetection() {
+        if (!isDetecting.get()) {
+            return;
+        }
         if (mAccelerometerSensor != null && mGyroSensor != null) {
             mSensorManager.unregisterListener(this, mAccelerometerSensor);
             mSensorManager.unregisterListener(this, mGyroSensor);
         }
+        if (mFenceReceiver != null) {
+            unregisterReceiver(mFenceReceiver);
+        }
+        Awareness.FenceApi.updateFences(
+                mGoogleApiClient,
+                new FenceUpdateRequest.Builder()
+                        .removeFence(START_FENCE_KEY)
+                        .build())
+                .setResultCallback(new ResultCallback<Status>() {
+                    @Override
+                    public void onResult(@NonNull Status status) {
+                        mGoogleApiClient.disconnect();
+                        if (status.isSuccess()) {
+                            Log.i(TAG, "Fence was successfully unregistered.");
+                        } else {
+                            Log.e(TAG, "Fence could not be unregistered: " + status);
+                        }
+                    }
+                });
+        mSensorManager.requestTriggerSensor(mTriggerEventListener, mSignificantMotionSensor);
+        isDetecting.set(false);
+    }
+
+    private void stop() {
+        stopDetection();
         stopForeground(true);
         stopSelf();
     }
@@ -252,7 +330,7 @@ public class InneedService extends Service implements SensorEventListener {
             final DataSample sampleAccelerometer = new AccelerometerDataSample(accX, accY, accZ);
             queue.addSample(sampleAccelerometer);
             if (DEBUG) {
-                //    Log.d(TAG, "queue size: " + String.valueOf(queue.size()));
+                Log.v(TAG, "queue size: " + String.valueOf(queue.size()));
             }
             if (requestSendAsyncTask.getStatus() != AsyncTask.Status.RUNNING ||
                     requestCheckAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
@@ -265,7 +343,6 @@ public class InneedService extends Service implements SensorEventListener {
                         }
                     } else {
                         fallMaybeHappen();
-
                     }
                 }
             }
@@ -401,4 +478,37 @@ public class InneedService extends Service implements SensorEventListener {
         };
     }
 
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        mFenceReceiver = new StillStateReceiver();
+        registerReceiver(mFenceReceiver, new IntentFilter(FENCE_RECEIVER_ACTION));
+        AwarenessFence stillStartFence = DetectedActivityFence.during(DetectedActivityFence.STILL);
+
+        Intent startIntent = new Intent(FENCE_RECEIVER_ACTION);
+        String FENCE_KEY = "fence_key";
+        startIntent.putExtra(FENCE_KEY, START_FENCE_KEY);
+        PendingIntent mStartPendingIntent =
+                PendingIntent.getBroadcast(InneedService.this, 0, startIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        Awareness.FenceApi.updateFences(
+                mGoogleApiClient,
+                new FenceUpdateRequest.Builder()
+                        .addFence(START_FENCE_KEY, stillStartFence, mStartPendingIntent)
+                        .build())
+                .setResultCallback(new ResultCallback<Status>() {
+                    @Override
+                    public void onResult(@NonNull Status status) {
+                        if (status.isSuccess()) {
+                            Log.i(TAG, "Fence was successfully registered.");
+                        } else {
+                            Log.e(TAG, "Fence could not be registered: " + status);
+                        }
+                    }
+                });
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
 }
