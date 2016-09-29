@@ -52,25 +52,16 @@ public class SettingsActivity extends AppCompatActivity {
     private ContactListAdapter contactListAdapter;
     private static final int defaultTimeToWait = 15;
     private int timeToWait;
+    private Activity context;
 
     public static final String SHARED_PREFS_NAME = "frieninneed";
     public static final String CONTACTS = "contacts";
     public static final String TRACKING_STATUS = "tracking_status";
     public static final String TIME_TO_WAIT = "time_to_wait";
     private static final int PERMISSIONS_REQUEST_READ_CONTACTS = 100;
-    public static final int PERMISSIONS_REQUEST_LOCATION = 200;
-    public static final int PERMISSIONS_REQUEST_SMS = 300;
+    public static final int PERMISSIONS_REQUEST_SMS_LOCATION = 200;
     public final static int SYSTEM_ALERTS_REQUEST_CODE = 5463 & 0xffffff00;
-
-    public void checkDrawOverlayPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
-                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:" + getPackageName()));
-                startActivityForResult(intent, SYSTEM_ALERTS_REQUEST_CODE);
-            }
-        }
-    }
+    public final static String[] LOCATION_SMS_PERMISSIONS = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.SEND_SMS};
 
     private ArrayList<Contact> contactArrayList;
 
@@ -78,7 +69,7 @@ public class SettingsActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings_activity);
-
+        context = this;
         prefs = getBaseContext().getSharedPreferences(SHARED_PREFS_NAME,
                 Context.MODE_PRIVATE);
 
@@ -91,8 +82,6 @@ public class SettingsActivity extends AppCompatActivity {
                 readContact();
             }
         });
-
-
 
         trackingSwitchTextView = (TextView) findViewById(R.id.tracking_switch_text);
         trackingSwitch = (SwitchCompat) findViewById(R.id.tracking_switch);
@@ -115,33 +104,32 @@ public class SettingsActivity extends AppCompatActivity {
         numberPicker.setMaxValue(60);
         numberPicker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
 
-
-
         trackingStatus = prefs.getBoolean(TRACKING_STATUS, false);
-
         trackingSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if (trackingStatus) {
-                    trackingStatus = false;
-                }
                 if (isChecked) {
-                    startServiceIfPermissionsGranted();
-                    trackingSwitchTextView.setText(getResources().getString(R.string.tracking_is_running));
+                    if(hasLocatinSmsPermissiongs(context, LOCATION_SMS_PERMISSIONS) && checkDrawOverlayPermission()){
+                        startServiceSaveUI();
+                    } else {
+                        addDrawOverlayPermission();
+                        ActivityCompat.requestPermissions(context, new String[]{
+                            Manifest.permission.SEND_SMS,
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION},
+                            PERMISSIONS_REQUEST_SMS_LOCATION);
+                    }
                 } else {
                     InneedService.stopInnedService(SettingsActivity.this);
                     trackingSwitchTextView.setText(getResources().getString(R.string.turn_on_tracking));
+                    trackingStatus = false;
+                    savingTrackStatusToSharePref(trackingStatus);
                 }
-                trackingStatus = isChecked;
-                SharedPreferences.Editor editor = prefs.edit();
-                editor.putBoolean(TRACKING_STATUS, isChecked);
-                editor.commit();
             }
         });
-
-        ListView contactsAddedListView = (ListView) findViewById(R.id.contacts_added_list);
         trackingSwitch.setChecked(trackingStatus);
 
+        ListView contactsAddedListView = (ListView) findViewById(R.id.contacts_added_list);
         contactArrayList = getContactsListSharePref(this);
         if (contactArrayList == null) {
             contactArrayList = new ArrayList<>();
@@ -168,6 +156,24 @@ public class SettingsActivity extends AppCompatActivity {
         });
     }
 
+    private void startServiceSaveUI() {
+        InneedService.startInneedService(context);
+        trackingSwitchTextView.setText(getResources().getString(R.string.tracking_is_running));
+        trackingStatus = true;
+        savingTrackStatusToSharePref(trackingStatus);
+    }
+
+    private boolean hasLocatinSmsPermissiongs(Context context, String... permissions) {
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && context != null && permissions != null) {
+            for (String permission : permissions) {
+                if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -180,13 +186,11 @@ public class SettingsActivity extends AppCompatActivity {
         numberPicker.setValue(timeToWait);
     }
 
-
     @Override
     protected void onStop() {
         super.onStop();
         saveContactsListSharePref(this, contactArrayList);
     }
-
 
     @TargetApi(Build.VERSION_CODES.KITKAT)
     @Override
@@ -194,7 +198,7 @@ public class SettingsActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         switch (requestCode) {
-            case (PICK_CONTACT):
+            case PICK_CONTACT:
                 if (resultCode == Activity.RESULT_OK) {
                     Uri uri = data.getData();
                     Cursor cursor = getContentResolver().query(uri, null, null, null, null);
@@ -225,46 +229,23 @@ public class SettingsActivity extends AppCompatActivity {
 
                     saveContactsListSharePref(this, contactArrayList);
                 }
-            case (SYSTEM_ALERTS_REQUEST_CODE):
-            case (PERMISSIONS_REQUEST_LOCATION):
-            case (PERMISSIONS_REQUEST_SMS):
-                startServiceIfPermissionsGranted();
+                break;
+            case SYSTEM_ALERTS_REQUEST_CODE:
+                if(hasLocatinSmsPermissiongs(context, LOCATION_SMS_PERMISSIONS) && checkDrawOverlayPermission()){
+                    startServiceSaveUI();
+                    trackingSwitch.setChecked(trackingStatus);
+                } else {
+                    //trackingStatus = false;
+                    //SharedPreferences.Editor editor = prefs.edit();
+                    //editor.putBoolean(TRACKING_STATUS, trackingStatus);
+                    //editor.commit();
+                    Toast.makeText(SettingsActivity.this, R.string.location_sms_windows_features_perm_accept, Toast.LENGTH_LONG)
+                        .show();
+                }
+                break;
             default:
                 //nothn
         }
-    }
-
-    private void startServiceIfPermissionsGranted() {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
-                    checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-
-                ActivityCompat.requestPermissions(
-                        this,
-                        new String[]{
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                        },
-                        SettingsActivity.PERMISSIONS_REQUEST_LOCATION);
-                return;
-            }
-            if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-
-                ActivityCompat.requestPermissions(
-                        this,
-                        new String[]{
-                                Manifest.permission.SEND_SMS
-                        },
-                        SettingsActivity.PERMISSIONS_REQUEST_SMS);
-                return;
-            }
-            if (!Settings.canDrawOverlays(this)) {
-                checkDrawOverlayPermission();
-                return;
-            }
-        }
-        InneedService.startInneedService(this);
     }
 
     public void readContact() {
@@ -290,7 +271,6 @@ public class SettingsActivity extends AppCompatActivity {
         editor.commit();
     }
 
-
     public static ArrayList<Contact> getContactsListSharePref(Context context) {
         List<Contact> sharedContactList = new ArrayList<>();
 
@@ -307,7 +287,6 @@ public class SettingsActivity extends AppCompatActivity {
             sharedContactList = new ArrayList<>(sharedContactList);
         } else
             return (ArrayList<Contact>) sharedContactList;
-
         return (ArrayList<Contact>) sharedContactList;
     }
 
@@ -316,19 +295,53 @@ public class SettingsActivity extends AppCompatActivity {
         switch (requestCode) {
             case PERMISSIONS_REQUEST_READ_CONTACTS:
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // Permission Granted
                     Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
                     startActivityForResult(intent, PICK_CONTACT);
                 } else {
-                    // Permission Denied
                     Toast.makeText(SettingsActivity.this, R.string.contacts_perm_accept, Toast.LENGTH_SHORT)
                             .show();
+                }
+                break;
+            case PERMISSIONS_REQUEST_SMS_LOCATION:
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED
+                    && grantResults[1] == PackageManager.PERMISSION_GRANTED
+                    && grantResults[2] == PackageManager.PERMISSION_GRANTED
+                    && checkDrawOverlayPermission()) {
+                    startServiceSaveUI();
+                    trackingSwitch.setChecked(trackingStatus);
+                } else {
+                    Toast.makeText(SettingsActivity.this, R.string.location_sms_windows_features_perm_accept, Toast.LENGTH_LONG)
+                        .show();
                 }
                 break;
             default:
                 super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         }
-
     }
+
+    private void savingTrackStatusToSharePref(boolean trackingStatus){
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean(TRACKING_STATUS, trackingStatus);
+        editor.commit();
+    }
+
+    public void addDrawOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, SYSTEM_ALERTS_REQUEST_CODE);
+            }
+        }
+    }
+
+    public boolean checkDrawOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
 
 }
