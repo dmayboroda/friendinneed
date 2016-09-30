@@ -10,6 +10,8 @@
     <string name="send">Send alarm</string>
     <string name="discard">Discard</string>
     <string name="dialog_title">Fall detected</string>
+    <string name="dialog_title_formatted">Fall detected\nCAll for help in: %d sec</string>
+
     <string name="add_contact">Add contact</string>
     <string name="turn_on_tracking">Turn on tracking for start</string>
     <string name="emergency_contacts">Emergency cotacts:</string>

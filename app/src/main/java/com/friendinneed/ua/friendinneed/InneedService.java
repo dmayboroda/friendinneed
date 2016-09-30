@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -19,11 +21,13 @@ import android.hardware.TriggerEvent;
 import android.hardware.TriggerEventListener;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.IBinder;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.WorkerThread;
@@ -53,6 +57,7 @@ import com.google.gson.Gson;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import okhttp3.MediaType;
@@ -101,6 +106,15 @@ public class InneedService extends Service implements SensorEventListener, Googl
     private AsyncTask<Integer, Void, Void> requestSendAsyncTask = getSendDataTask();
     private AsyncTask<Void, Void, Void> requestCheckAsyncTask = getSendCheckDataTask();
     private StillStateReceiver mFenceReceiver;
+    private SensorManager mSensorManager;
+    private Sensor mAccelerometerSensor;
+    private Sensor mGyroSensor;
+    private Sensor mSignificantMotionSensor;
+    AlertDialog dialog;
+    AlertDialog countDownDialog;
+    Vibrator mVibrator;
+    private CountDownTimer userCountDownTimer;
+    private CountDownTimer inactivityFirstTimer;
 
     private DialogInterface.OnClickListener onSendClickListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
@@ -114,24 +128,46 @@ public class InneedService extends Service implements SensorEventListener, Googl
             dialog.dismiss();
         }
     };
+    private DialogInterface.OnClickListener onSendFallClickListener = new DialogInterface.OnClickListener() {
+        public void onClick(DialogInterface dialog, int id) {
+            if (userCountDownTimer!=null) {
+                userCountDownTimer.cancel();
+            }
+            callForHelp();
+            dialog.dismiss();
+            resumeInnedService(getApplicationContext());
+        }
+    };
+    private DialogInterface.OnClickListener onDiscardFallClickListener = new DialogInterface.OnClickListener() {
+        public void onClick(DialogInterface dialog, int id) {
+            if (userCountDownTimer!=null) {
+                userCountDownTimer.cancel();
+            }
+            dialog.dismiss();
+            resumeInnedService(getApplicationContext());
+        }
+    };
     private TriggerEventListener mTriggerEventListener = new TriggerEventListener() {
         @Override
         public void onTrigger(TriggerEvent event) {
             resumeInnedService(getApplicationContext());
             if (inactivityFirstTimer != null) {
                 inactivityFirstTimer.cancel();
+                isCheckingData.set(false);
             }
         }
     };
-
-    private SensorManager mSensorManager;
-    private Sensor mAccelerometerSensor;
-    private Sensor mGyroSensor;
-    private Sensor mSignificantMotionSensor;
-    AlertDialog dialog;
-    Vibrator mVibrator;
-    private CountDownTimer inactivityFirstTimer;
-
+    private TriggerEventListener mCountdownOffTriggerEventListener = new TriggerEventListener() {
+        @Override
+        public void onTrigger(TriggerEvent event) {
+            resumeInnedService(getApplicationContext());
+            if (userCountDownTimer != null) {
+                userCountDownTimer.cancel();
+                dialog.dismiss();
+                isCheckingData.set(false);
+            }
+        }
+    };
 
     public InneedService() {
     }
@@ -188,9 +224,11 @@ public class InneedService extends Service implements SensorEventListener, Googl
                 .addConnectionCallbacks(this)
                 .build();
         OkHttpClient.Builder clientBuilder = new OkHttpClient.Builder();
+        clientBuilder.connectTimeout(20000, TimeUnit.MILLISECONDS);
         clientBuilder.retryOnConnectionFailure(false);
         client = clientBuilder.build();
         dialog = getDialog();
+        countDownDialog = getCountdownDialog();
         mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         mAccelerometerSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
@@ -295,7 +333,6 @@ public class InneedService extends Service implements SensorEventListener, Googl
 
     void sendCheckRequest() {
         requestCheckAsyncTask = getSendCheckDataTask();
-        isCheckingData.set(true);
         requestCheckAsyncTask.execute();
     }
 
@@ -310,6 +347,22 @@ public class InneedService extends Service implements SensorEventListener, Googl
         builder.setTitle(R.string.dialog_title);
         builder.setPositiveButton(R.string.send, onSendClickListener);
         builder.setNegativeButton(R.string.discard, onDiscardClickListener);
+        builder.setCancelable(false);
+        AlertDialog dialog = builder.create();
+        Window dialogWindow = dialog.getWindow();
+        if (dialogWindow != null) {
+            dialogWindow.setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+            return dialog;
+        }
+        return null;
+    }
+
+    @Nullable
+    private AlertDialog getCountdownDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(new ContextThemeWrapper(this, R.style.alertDialog));
+        builder.setTitle(R.string.dialog_title);
+        builder.setPositiveButton(R.string.send, onSendFallClickListener);
+        builder.setNegativeButton(R.string.discard, onDiscardFallClickListener);
         builder.setCancelable(false);
         AlertDialog dialog = builder.create();
         Window dialogWindow = dialog.getWindow();
@@ -335,7 +388,7 @@ public class InneedService extends Service implements SensorEventListener, Googl
             if (requestSendAsyncTask.getStatus() != AsyncTask.Status.RUNNING ||
                     requestCheckAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
                 if (!isCheckingData.get() && checkForJolt(accX, accY, accZ)) {
-                    //Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
+//                    Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
                     if (isCheckDialogVersion) {
                         if (!dialog.isShowing()) {
                             dialog.show();
@@ -367,6 +420,7 @@ public class InneedService extends Service implements SensorEventListener, Googl
     }
 
     private void fallMaybeHappen() {
+        isCheckingData.set(true);
         inactivityFirstTimer = new CountDownTimer(getSharedPreferences(
                 SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
                 getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
@@ -393,26 +447,36 @@ public class InneedService extends Service implements SensorEventListener, Googl
 
     private void callForHelp() {
         LocationManager locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
-
+        Log.i(TAG, "callForHelp");
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            //TODO: do the permissions stuff
+            // we never reach here, but studio is asking us to leave this code here
             return;
         }
         Location location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        String message;
         if (location != null) {
-            SmsManager sms = SmsManager.getDefault();
-            String message = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
+            message = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
 
-            ArrayList<Contact> contactsArray = SettingsActivity.getContactsListSharePref(this);
-            try {
-                for (Contact contact : contactsArray) {
-                    sms.sendTextMessage(contact.getContactNumber(), null, message, null, null);
-                }
-                Toast.makeText(getApplicationContext(), "SMS sent.", Toast.LENGTH_LONG).show();
-            } catch (Exception e) {
-                Toast.makeText(getApplicationContext(), "SMS failed, please try again.", Toast.LENGTH_LONG).show();
-                e.printStackTrace();
+        } else {
+            if (canToggleGPS()) {
+                turnGPSOn();
+                location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                message = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
+            } else {
+                message = "I need Your help, call me please.";//"SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
             }
+        }
+        SmsManager sms = SmsManager.getDefault();
+
+        ArrayList<Contact> contactsArray = SettingsActivity.getContactsListSharePref(this);
+        try {
+            for (Contact contact : contactsArray) {
+                sms.sendTextMessage(contact.getContactNumber(), null, message, null, null);
+            }
+            Toast.makeText(getApplicationContext(), "SMS sent.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(getApplicationContext(), "SMS failed, please try again.", Toast.LENGTH_LONG).show();
+            e.printStackTrace();
         }
     }
 
@@ -468,12 +532,38 @@ public class InneedService extends Service implements SensorEventListener, Googl
                 if (response != null) {
                     Log.v(TAG, response);
                     if (Boolean.TRUE == Boolean.parseBoolean(response)) {
-                        callForHelp();
+                        countDownDialog.show();
+
+                        mVibrator.vibrate(800);
+
+                        userCountDownTimer = new CountDownTimer(getSharedPreferences(
+                                SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
+                                getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
+                                MILLIS_IN_SECOND) {
+                            @Override
+                            public void onTick(long millisUntilFinished) {
+                                countDownDialog.setTitle(String.format(getString(R.string.dialog_title_formatted), (millisUntilFinished/MILLIS_IN_SECOND)));
+                                Log.d(TAG, "userCountDownTimer is ticking: " +
+                                        (millisUntilFinished/MILLIS_IN_SECOND));
+                            }
+
+                            @Override
+                            public void onFinish() {
+                                callForHelp();
+                                countDownDialog.dismiss();
+                                isCheckingData.set(false);
+                                cancel();
+                            }
+                        }.start();
+
+                        mSensorManager.requestTriggerSensor(mCountdownOffTriggerEventListener, mSignificantMotionSensor);
+                    } else {
+                        isCheckingData.set(false);
                     }
                 } else {
+                    isCheckingData.set(false);
                     Log.v(TAG, "no connection most probably");
                 }
-                isCheckingData.set(false);
             }
         };
     }
@@ -511,4 +601,51 @@ public class InneedService extends Service implements SensorEventListener, Googl
     public void onConnectionSuspended(int i) {
 
     }
+
+    private boolean canToggleGPS() {
+        PackageManager pacman = getPackageManager();
+        PackageInfo pacInfo = null;
+
+        try {
+            pacInfo = pacman.getPackageInfo("com.android.settings", PackageManager.GET_RECEIVERS);
+        } catch (PackageManager.NameNotFoundException e) {
+            return false; //package not found
+        }
+
+        if(pacInfo != null){
+            for(ActivityInfo actInfo : pacInfo.receivers){
+                //test if recevier is exported. if so, we can toggle GPS.
+                if(actInfo.name.equals("com.android.settings.widget.SettingsAppWidgetProvider") && actInfo.exported){
+                    return true;
+                }
+            }
+        }
+
+        return false; //default
+    }
+
+    private void turnGPSOn(){
+        String provider = Settings.Secure.getString(getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
+
+        if(!provider.contains("gps")){ //if gps is disabled
+            final Intent poke = new Intent();
+            poke.setClassName("com.android.settings", "com.android.settings.widget.SettingsAppWidgetProvider");
+            poke.addCategory(Intent.CATEGORY_ALTERNATIVE);
+            poke.setData(Uri.parse("3"));
+            sendBroadcast(poke);
+        }
+    }
+
+    private void turnGPSOff(){
+        String provider = Settings.Secure.getString(getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
+
+        if(provider.contains("gps")){ //if gps is enabled
+            final Intent poke = new Intent();
+            poke.setClassName("com.android.settings", "com.android.settings.widget.SettingsAppWidgetProvider");
+            poke.addCategory(Intent.CATEGORY_ALTERNATIVE);
+            poke.setData(Uri.parse("3"));
+            sendBroadcast(poke);
+        }
+    }
+
 }
