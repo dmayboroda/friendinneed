@@ -74,6 +74,8 @@ import static java.lang.Math.sqrt;
  */
 public class InneedService extends Service implements SensorEventListener, GoogleApiClient.ConnectionCallbacks {
 
+    public static final String SOS_MESSAGE_PREFIX = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:";
+    public static final String SOS_MESSAGE_NO_LOCATION = "I need Your help, call me please.";
     private GoogleApiClient mGoogleApiClient;
     private static final boolean isCheckDialogVersion = false;
     public static final int MILLIS_IN_SECOND = 1000;
@@ -455,15 +457,15 @@ public class InneedService extends Service implements SensorEventListener, Googl
         Location location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
         String message;
         if (location != null) {
-            message = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
+            message = SOS_MESSAGE_PREFIX + location.getLatitude() + "," + location.getLongitude();
 
         } else {
             if (canToggleGPS()) {
                 turnGPSOn();
                 location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                message = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
+                message = SOS_MESSAGE_PREFIX + location.getLatitude() + "," + location.getLongitude();
             } else {
-                message = "I need Your help, call me please.";//"SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
+                message = SOS_MESSAGE_NO_LOCATION;//"SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
             }
         }
         SmsManager sms = SmsManager.getDefault();
