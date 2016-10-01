@@ -94,7 +94,8 @@ public class InneedService extends Service implements SensorEventListener, Googl
 
     private static final int SERVICE_ID = 0110;
 
-    private static final double G_POINT = 1.8 * 9.8;
+    public static final double GRAVITY = 9.8;
+    private static final double G_POINT = 1.8 * GRAVITY;
     private static final double EPSILON = 0.0;
     private static final int QUEUE_TIMEOUT_MILLIS = 2000;
     private static final int DEFAULT_WAIT_TIME = 15;
@@ -483,9 +484,12 @@ public class InneedService extends Service implements SensorEventListener, Googl
     }
 
     private boolean checkForJolt(float accX, float accY, float accZ) {
+        return calculateGValue(accX, accY, accZ) > G_POINT;
+    }
+
+    public static double calculateGValue(float accX, float accY, float accZ) {
         float sum = (accX * accX) + (accY * accY) + (accZ * accZ);
-        double checkVar = Math.sqrt(Double.parseDouble(Float.toString(sum)));
-        return (checkVar > G_POINT);
+        return Math.sqrt(Double.parseDouble(Float.toString(sum)));
     }
 
     private AsyncTask<Integer, Void, Void> getSendDataTask() {

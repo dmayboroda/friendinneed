@@ -10,6 +10,11 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Color;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -23,16 +28,26 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CompoundButton;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.NumberPicker;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.androidplot.Plot;
+import com.androidplot.util.PlotStatistics;
+import com.androidplot.util.Redrawer;
+import com.androidplot.xy.BoundaryMode;
+import com.androidplot.xy.LineAndPointFormatter;
+import com.androidplot.xy.SimpleXYSeries;
+import com.androidplot.xy.XYPlot;
+import com.androidplot.xy.XYStepMode;
 import com.friendinneed.ua.friendinneed.model.Contact;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -64,6 +79,8 @@ public class SettingsActivity extends AppCompatActivity {
     public final static String[] LOCATION_SMS_PERMISSIONS = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.SEND_SMS};
 
     private ArrayList<Contact> contactArrayList;
+
+    private double maxGValue = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -154,6 +171,112 @@ public class SettingsActivity extends AppCompatActivity {
                 return true;
             }
         });
+
+        if (BuildConfig.DEBUG) {
+            initDebugTools();
+        }
+    }
+
+    private void initDebugTools() {
+        final LinearLayout contentWrapper = (LinearLayout) findViewById(R.id.content_wrap);
+        final TextView gValueTextView = new TextView(this);
+
+        gValueTextView.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View view) {
+                gValueTextView.setText(String.valueOf(0));
+                maxGValue = 0;
+                return false;
+            }
+        });
+        XYPlot accelerometerHistoryPlot = new XYPlot(this, "accelerometer", Plot.RenderMode.USE_BACKGROUND_THREAD);
+        accelerometerHistoryPlot.getGraphWidget().setShowRangeLabels(true);
+
+
+        final SimpleXYSeries xHistorySeries = new SimpleXYSeries("X");
+        final SimpleXYSeries yHistorySeries = new SimpleXYSeries("Y");
+        final SimpleXYSeries zHistorySeries = new SimpleXYSeries("Z");
+        xHistorySeries.useImplicitXVals();
+        yHistorySeries.useImplicitXVals();
+        zHistorySeries.useImplicitXVals();
+
+        accelerometerHistoryPlot.setGridPadding(100, 50, 0, 0);
+        accelerometerHistoryPlot.setRangeStep(XYStepMode.INCREMENT_BY_VAL, 5.0d);
+
+        accelerometerHistoryPlot.setDomainBoundaries(0, 500, BoundaryMode.FIXED);             // number of points to plot in history
+        accelerometerHistoryPlot.addSeries(xHistorySeries,
+                new LineAndPointFormatter(
+                        Color.rgb(100, 100, 200), null, null, null));
+        accelerometerHistoryPlot.addSeries(yHistorySeries,
+                new LineAndPointFormatter(
+                        Color.rgb(100, 200, 100), null, null, null));
+        accelerometerHistoryPlot.addSeries(zHistorySeries,
+                new LineAndPointFormatter(
+                        Color.rgb(200, 100, 100), null, null, null));
+
+        final PlotStatistics histStats = new PlotStatistics(1000, false);
+
+        accelerometerHistoryPlot.addListener(histStats);
+
+        SensorManager sensorManager = (SensorManager) getApplicationContext().getSystemService(Context.SENSOR_SERVICE);
+        Sensor accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+
+        final SimpleXYSeries xSeries = new SimpleXYSeries("X");
+        final SimpleXYSeries ySeries = new SimpleXYSeries("Y");
+        final SimpleXYSeries zSeries = new SimpleXYSeries("Z");
+
+        sensorManager.registerListener(new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent sensorEvent) {
+                float accX = sensorEvent.values[0];
+                float accY = sensorEvent.values[1];
+                float accZ = sensorEvent.values[2];
+                double gValue = InneedService.calculateGValue(accX, accY, accZ) / InneedService.GRAVITY;
+
+                if (gValue > maxGValue) {
+                    gValueTextView.setText(String.valueOf(gValue));
+                    maxGValue = gValue;
+                }
+
+                xSeries.setModel(Collections.singletonList(
+                        accX),
+                        SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
+
+                ySeries.setModel(Collections.singletonList(
+                        accY),
+                        SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
+
+                zSeries.setModel(Collections.singletonList(
+                        accZ),
+                        SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
+
+                // get rid the oldest sample in history:
+                if (zHistorySeries.size() > 500) {            // number of points to plot in history
+                    zHistorySeries.removeFirst();
+                    yHistorySeries.removeFirst();
+                    xHistorySeries.removeFirst();
+                }
+
+                // add the latest history sample:
+                xHistorySeries.addLast(null, accX);
+                yHistorySeries.addLast(null, accY);
+                zHistorySeries.addLast(null, accZ);
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int i) {
+
+            }
+        }, accelerometerSensor, SensorManager.SENSOR_DELAY_UI);
+
+        Redrawer redrawer = new Redrawer(
+                Arrays.asList(new Plot[]{accelerometerHistoryPlot}),
+                100, false);
+
+        contentWrapper.addView(gValueTextView);
+        contentWrapper.addView(accelerometerHistoryPlot);
+        redrawer.start();
     }
 
     private void startServiceSaveUI() {
