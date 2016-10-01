@@ -77,7 +77,7 @@ public class InneedService extends Service implements SensorEventListener, Googl
     public static final String SOS_MESSAGE_PREFIX = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:";
     public static final String SOS_MESSAGE_NO_LOCATION = "I need Your help, call me please.";
     private GoogleApiClient mGoogleApiClient;
-    private static final boolean isCheckDialogVersion = false;
+    private static final boolean isCheckDialogVersion = true;
     public static final int MILLIS_IN_SECOND = 1000;
     private static AtomicBoolean isCheckingData = new AtomicBoolean(false);
     private static AtomicBoolean isDetecting = new AtomicBoolean(false);
@@ -95,7 +95,8 @@ public class InneedService extends Service implements SensorEventListener, Googl
     private static final int SERVICE_ID = 0110;
 
     public static final double GRAVITY = 9.8;
-    private static final double G_POINT = 1.8 * GRAVITY;
+    private static final double G_POINT_MIN = 6.0 * GRAVITY;
+    private static final double G_POINT_MAX = 10.0 * GRAVITY;
     private static final double EPSILON = 0.0;
     private static final int QUEUE_TIMEOUT_MILLIS = 2000;
     private static final int DEFAULT_WAIT_TIME = 15;
@@ -484,7 +485,8 @@ public class InneedService extends Service implements SensorEventListener, Googl
     }
 
     private boolean checkForJolt(float accX, float accY, float accZ) {
-        return calculateGValue(accX, accY, accZ) > G_POINT;
+        double gValue = calculateGValue(accX, accY, accZ);
+        return G_POINT_MIN < gValue && gValue < G_POINT_MAX;
     }
 
     public static double calculateGValue(float accX, float accY, float accZ) {
