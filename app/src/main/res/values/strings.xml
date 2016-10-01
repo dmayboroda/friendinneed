@@ -25,4 +25,5 @@
     <string name="location_perm_accept">Please accept LOCATION ACCESS permissions</string>
     <string name="sms_perm_accept">Please accept SMS SEDNDING ACCESS permissions</string>
     <string name="location_sms_windows_features_perm_accept">Please accept LOCATION, SMS SENDING ACCESS and WINDOWS FEATURES permissions</string>
+    <string name="is_protecting_you">FriendInNeed is protecting You!</string>
 </resources>

@@ -293,7 +293,7 @@ public class InneedService extends Service implements SensorEventListener, Googl
 
     private Notification createNotification() {
         return new NotificationCompat.Builder(this)
-                .setContentTitle(getString(R.string.app_name))
+                .setContentTitle(getString(R.string.is_protecting_you))
                 .setSmallIcon(R.drawable.ic_notif)
                 .setLargeIcon(createBitmap())
                 .setContentIntent(createIntent())
