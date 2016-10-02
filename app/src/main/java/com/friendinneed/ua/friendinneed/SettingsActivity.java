@@ -62,7 +62,7 @@ public class SettingsActivity extends AppCompatActivity {
     private SwitchCompat trackingSwitch;
     private TextView trackingSwitchTextView;
     private NumberPicker numberPicker;
-    final int PICK_CONTACT = 1;
+
     private String phoneNumber;
     private ContactListAdapter contactListAdapter;
     private static final int defaultTimeToWait = 15;
@@ -73,10 +73,13 @@ public class SettingsActivity extends AppCompatActivity {
     public static final String CONTACTS = "contacts";
     public static final String TRACKING_STATUS = "tracking_status";
     public static final String TIME_TO_WAIT = "time_to_wait";
+    public static final int PICK_CONTACT = 10;
+    private static final int PICK_CONTACT_REQUEST = 20;
     private static final int PERMISSIONS_REQUEST_READ_CONTACTS = 100;
+    private static final int PERMISSIONS_REQUEST_READ_CONTACTS_FOR_ADD = 150;
     public static final int PERMISSIONS_REQUEST_SMS_LOCATION = 200;
-    public final static int SYSTEM_ALERTS_REQUEST_CODE = 5463 & 0xffffff00;
-    public final static String[] LOCATION_SMS_PERMISSIONS = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.SEND_SMS};
+    public static final int SYSTEM_ALERTS_REQUEST_CODE = 400;
+    public static final String[] LOCATION_SMS_PERMISSIONS = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.SEND_SMS};
 
     private ArrayList<Contact> contactArrayList;
 
@@ -92,11 +95,18 @@ public class SettingsActivity extends AppCompatActivity {
 
         contactArrayList = new ArrayList<>();
 
-        Button addContactBtn = (Button) findViewById(R.id.add_contact_btn);
+        Button addContactBtn = (Button) findViewById(R.id.choose_contact_btn);
         addContactBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 readContact();
+            }
+        });
+
+        final Button createAndAddContact = (Button) findViewById(R.id.create_contact_btn);
+        createAndAddContact.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                createAndAddContact();
             }
         });
 
@@ -279,6 +289,7 @@ public class SettingsActivity extends AppCompatActivity {
         redrawer.start();
     }
 
+
     private void startServiceSaveUI() {
         InneedService.startInneedService(context);
         trackingSwitchTextView.setText(getResources().getString(R.string.tracking_is_running));
@@ -324,33 +335,13 @@ public class SettingsActivity extends AppCompatActivity {
             case PICK_CONTACT:
                 if (resultCode == Activity.RESULT_OK) {
                     Uri uri = data.getData();
-                    Cursor cursor = getContentResolver().query(uri, null, null, null, null);
-                    cursor.moveToFirst();
-                    ContentResolver cr = getContentResolver();
-                    String contactID = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));
-                    String name = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
-
-                    // get phone number
-                    if (Integer.parseInt(cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
-
-                        Cursor pCur = cr.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null,
-                                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                                new String[]{contactID}, null);
-                        while (pCur.moveToNext()) {
-                            phoneNumber = pCur.getString(
-                                    pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
-                        }
-                        pCur.close();
-                    }
-
-                    Contact contact = new Contact(name, phoneNumber, uri);
-                    if (contactArrayList == null) {
-                        contactArrayList = new ArrayList<>();
-                    }
-                    contactArrayList.add(contact);
-                    contactListAdapter.notifyDataSetChanged();
-
-                    saveContactsListSharePref(this, contactArrayList);
+                    getContactDataFromUri(uri);
+                }
+                break;
+            case PICK_CONTACT_REQUEST:
+                if (resultCode == Activity.RESULT_OK) {
+                    Uri uri = data.getData();
+                    getContactDataFromUri(uri);
                 }
                 break;
             case SYSTEM_ALERTS_REQUEST_CODE:
@@ -358,10 +349,6 @@ public class SettingsActivity extends AppCompatActivity {
                     startServiceSaveUI();
                     trackingSwitch.setChecked(trackingStatus);
                 } else {
-                    //trackingStatus = false;
-                    //SharedPreferences.Editor editor = prefs.edit();
-                    //editor.putBoolean(TRACKING_STATUS, trackingStatus);
-                    //editor.commit();
                     Toast.makeText(SettingsActivity.this, R.string.location_sms_windows_features_perm_accept, Toast.LENGTH_LONG)
                         .show();
                 }
@@ -372,7 +359,6 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     public void readContact() {
-
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
             Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
             startActivityForResult(intent, PICK_CONTACT);
@@ -382,6 +368,18 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+    private void createAndAddContact() {
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                Intent i = new Intent(Intent.ACTION_INSERT);
+            i.setType(ContactsContract.Contacts.CONTENT_TYPE);
+            if (Integer.valueOf(Build.VERSION.SDK) > 14)
+                i.putExtra("finishActivityOnSaveCompleted", true); // Fix for 4.0.3 +
+            startActivityForResult(i, PICK_CONTACT_REQUEST);
+        }
+        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, PERMISSIONS_REQUEST_READ_CONTACTS_FOR_ADD);
+        }
+    }
 
     public void saveContactsListSharePref(Context context, List<Contact> contactListToShare) {
 
@@ -418,11 +416,18 @@ public class SettingsActivity extends AppCompatActivity {
         switch (requestCode) {
             case PERMISSIONS_REQUEST_READ_CONTACTS:
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
-                    startActivityForResult(intent, PICK_CONTACT);
+                   readContact();
                 } else {
                     Toast.makeText(SettingsActivity.this, R.string.contacts_perm_accept, Toast.LENGTH_SHORT)
                             .show();
+                }
+                break;
+            case PERMISSIONS_REQUEST_READ_CONTACTS_FOR_ADD:
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                   createAndAddContact();
+                } else {
+                    Toast.makeText(SettingsActivity.this, R.string.contacts_perm_accept, Toast.LENGTH_SHORT)
+                        .show();
                 }
                 break;
             case PERMISSIONS_REQUEST_SMS_LOCATION:
@@ -466,5 +471,31 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
+    public void getContactDataFromUri(Uri uri){
+        Cursor cursor = getContentResolver().query(uri, null, null, null, null);
+        cursor.moveToFirst();
+        ContentResolver cr = getContentResolver();
+        String contactID = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));
+        String name = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME));
 
+        // get phone number
+        if (Integer.parseInt(cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
+
+            Cursor pCur = cr.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null,
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                new String[]{contactID}, null);
+            while (pCur.moveToNext()) {
+                phoneNumber = pCur.getString(
+                    pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
+            }
+            pCur.close();
+        }
+        Contact contact = new Contact(name, phoneNumber, uri);
+        if (contactArrayList == null) {
+            contactArrayList = new ArrayList<>();
+        }
+        contactArrayList.add(contact);
+        contactListAdapter.notifyDataSetChanged();
+        saveContactsListSharePref(this, contactArrayList);
+    }
 }
