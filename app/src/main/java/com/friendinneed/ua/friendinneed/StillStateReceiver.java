@@ -11,7 +11,7 @@ public class StillStateReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (!TextUtils.equals(InneedService.FENCE_RECEIVER_ACTION, intent.getAction())) {
+        if (!TextUtils.equals(InNeedService.FENCE_RECEIVER_ACTION, intent.getAction())) {
             //some wrong action?
             return;
         }
@@ -20,7 +20,7 @@ public class StillStateReceiver extends BroadcastReceiver {
 
         switch (fenceState.getCurrentState()) {
             case FenceState.TRUE:
-                InneedService.suspendInnedService(context);
+                InNeedService.suspendInnedService(context);
                 break;
             case FenceState.FALSE:
                 break;

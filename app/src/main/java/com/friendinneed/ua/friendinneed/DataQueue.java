@@ -39,7 +39,15 @@ class DataQueue {
         }
     }
 
+    public void clear() {
+        dataQueue.clear();
+    }
+
     public int size() {
         return dataQueue.size();
+    }
+
+    public long getTimeElapsedSinceStartPercents() {
+        return 100 * (dataQueue.getLast().getTimestamp() - dataQueue.getFirst().getTimestamp()) / timeout;
     }
 }

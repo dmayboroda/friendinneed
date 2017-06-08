@@ -50,10 +50,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Created by mymac on 9/22/16.
- */
-
 public class SettingsActivity extends AppCompatActivity {
 
     public static final String SERVICE_ACTION = SettingsActivity.class.getSimpleName() + "_service";
@@ -79,7 +75,8 @@ public class SettingsActivity extends AppCompatActivity {
     private static final int PERMISSIONS_REQUEST_READ_CONTACTS_FOR_ADD = 150;
     public static final int PERMISSIONS_REQUEST_SMS_LOCATION = 200;
     public static final int SYSTEM_ALERTS_REQUEST_CODE = 400;
-    public static final String[] LOCATION_SMS_PERMISSIONS = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.SEND_SMS};
+    public static final String[] LOCATION_SMS_PERMISSIONS =
+          { Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.SEND_SMS };
 
     private ArrayList<Contact> contactArrayList;
 
@@ -91,7 +88,7 @@ public class SettingsActivity extends AppCompatActivity {
         setContentView(R.layout.settings_activity);
         context = this;
         prefs = getBaseContext().getSharedPreferences(SHARED_PREFS_NAME,
-                Context.MODE_PRIVATE);
+              Context.MODE_PRIVATE);
 
         contactArrayList = new ArrayList<>();
 
@@ -114,7 +111,7 @@ public class SettingsActivity extends AppCompatActivity {
         trackingSwitch = (SwitchCompat) findViewById(R.id.tracking_switch);
         numberPicker = (NumberPicker) findViewById(R.id.numb_picker_settings);
         numberPicker.setWrapSelectorWheel(false);
-            timeToWait = prefs.getInt(TIME_TO_WAIT, defaultTimeToWait);
+        timeToWait = prefs.getInt(TIME_TO_WAIT, defaultTimeToWait);
 
         numberPicker.setTag(timeToWait);
         numberPicker.setValue(timeToWait);
@@ -136,18 +133,19 @@ public class SettingsActivity extends AppCompatActivity {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                    if(hasLocatinSmsPermissiongs(context, LOCATION_SMS_PERMISSIONS) && checkDrawOverlayPermission()){
+                    if (hasLocatinSmsPermissiongs(context, LOCATION_SMS_PERMISSIONS) && checkDrawOverlayPermission()) {
                         startServiceSaveUI();
                     } else {
                         addDrawOverlayPermission();
-                        ActivityCompat.requestPermissions(context, new String[]{
-                            Manifest.permission.SEND_SMS,
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION},
-                            PERMISSIONS_REQUEST_SMS_LOCATION);
+                        ActivityCompat.requestPermissions(context, new String[] {
+                                    Manifest.permission.SEND_SMS,
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                              },
+                              PERMISSIONS_REQUEST_SMS_LOCATION);
                     }
                 } else {
-                    InneedService.stopInnedService(SettingsActivity.this);
+                    InNeedService.stopInnedService(SettingsActivity.this);
                     trackingSwitchTextView.setText(getResources().getString(R.string.turn_on_tracking));
                     trackingStatus = false;
                     savingTrackStatusToSharePref(trackingStatus);
@@ -202,7 +200,6 @@ public class SettingsActivity extends AppCompatActivity {
         XYPlot accelerometerHistoryPlot = new XYPlot(this, "accelerometer", Plot.RenderMode.USE_BACKGROUND_THREAD);
         accelerometerHistoryPlot.getGraphWidget().setShowRangeLabels(true);
 
-
         final SimpleXYSeries xHistorySeries = new SimpleXYSeries("X");
         final SimpleXYSeries yHistorySeries = new SimpleXYSeries("Y");
         final SimpleXYSeries zHistorySeries = new SimpleXYSeries("Z");
@@ -213,16 +210,17 @@ public class SettingsActivity extends AppCompatActivity {
         accelerometerHistoryPlot.setGridPadding(100, 50, 0, 0);
         accelerometerHistoryPlot.setRangeStep(XYStepMode.INCREMENT_BY_VAL, 5.0d);
 
-        accelerometerHistoryPlot.setDomainBoundaries(0, 500, BoundaryMode.FIXED);             // number of points to plot in history
+        accelerometerHistoryPlot.setDomainBoundaries(0, 500,
+              BoundaryMode.FIXED);             // number of points to plot in history
         accelerometerHistoryPlot.addSeries(xHistorySeries,
-                new LineAndPointFormatter(
-                        Color.rgb(100, 100, 200), null, null, null));
+              new LineAndPointFormatter(
+                    Color.rgb(100, 100, 200), null, null, null));
         accelerometerHistoryPlot.addSeries(yHistorySeries,
-                new LineAndPointFormatter(
-                        Color.rgb(100, 200, 100), null, null, null));
+              new LineAndPointFormatter(
+                    Color.rgb(100, 200, 100), null, null, null));
         accelerometerHistoryPlot.addSeries(zHistorySeries,
-                new LineAndPointFormatter(
-                        Color.rgb(200, 100, 100), null, null, null));
+              new LineAndPointFormatter(
+                    Color.rgb(200, 100, 100), null, null, null));
 
         final PlotStatistics histStats = new PlotStatistics(1000, false);
 
@@ -230,7 +228,6 @@ public class SettingsActivity extends AppCompatActivity {
 
         SensorManager sensorManager = (SensorManager) getApplicationContext().getSystemService(Context.SENSOR_SERVICE);
         Sensor accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-
 
         final SimpleXYSeries xSeries = new SimpleXYSeries("X");
         final SimpleXYSeries ySeries = new SimpleXYSeries("Y");
@@ -242,7 +239,7 @@ public class SettingsActivity extends AppCompatActivity {
                 float accX = sensorEvent.values[0];
                 float accY = sensorEvent.values[1];
                 float accZ = sensorEvent.values[2];
-                double gValue = InneedService.calculateGValue(accX, accY, accZ) / InneedService.GRAVITY;
+                double gValue = JoltCalculator.calculateGValue(accX, accY, accZ) / JoltCalculator.GRAVITY;
 
                 if (gValue > maxGValue) {
                     gValueTextView.setText(String.valueOf(gValue));
@@ -250,16 +247,16 @@ public class SettingsActivity extends AppCompatActivity {
                 }
 
                 xSeries.setModel(Collections.singletonList(
-                        accX),
-                        SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
+                      accX),
+                      SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
 
                 ySeries.setModel(Collections.singletonList(
-                        accY),
-                        SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
+                      accY),
+                      SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
 
                 zSeries.setModel(Collections.singletonList(
-                        accZ),
-                        SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
+                      accZ),
+                      SimpleXYSeries.ArrayFormat.Y_VALS_ONLY);
 
                 // get rid the oldest sample in history:
                 if (zHistorySeries.size() > 500) {            // number of points to plot in history
@@ -281,17 +278,16 @@ public class SettingsActivity extends AppCompatActivity {
         }, accelerometerSensor, SensorManager.SENSOR_DELAY_UI);
 
         Redrawer redrawer = new Redrawer(
-                Arrays.asList(new Plot[]{accelerometerHistoryPlot}),
-                100, false);
+              Arrays.asList(new Plot[] { accelerometerHistoryPlot }),
+              100, false);
 
         contentWrapper.addView(gValueTextView);
         contentWrapper.addView(accelerometerHistoryPlot);
         redrawer.start();
     }
 
-
     private void startServiceSaveUI() {
-        InneedService.startInneedService(context);
+        InNeedService.startInneedService(context);
         trackingSwitchTextView.setText(getResources().getString(R.string.tracking_is_running));
         trackingStatus = true;
         savingTrackStatusToSharePref(trackingStatus);
@@ -345,12 +341,13 @@ public class SettingsActivity extends AppCompatActivity {
                 }
                 break;
             case SYSTEM_ALERTS_REQUEST_CODE:
-                if(hasLocatinSmsPermissiongs(context, LOCATION_SMS_PERMISSIONS) && checkDrawOverlayPermission()){
+                if (hasLocatinSmsPermissiongs(context, LOCATION_SMS_PERMISSIONS) && checkDrawOverlayPermission()) {
                     startServiceSaveUI();
                     trackingSwitch.setChecked(trackingStatus);
                 } else {
-                    Toast.makeText(SettingsActivity.this, R.string.location_sms_windows_features_perm_accept, Toast.LENGTH_LONG)
-                        .show();
+                    Toast.makeText(SettingsActivity.this, R.string.location_sms_windows_features_perm_accept,
+                          Toast.LENGTH_LONG)
+                          .show();
                 }
                 break;
             default:
@@ -359,32 +356,36 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     public void readContact() {
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+              && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
             Intent intent = new Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI);
             startActivityForResult(intent, PICK_CONTACT);
-        }
-        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, PERMISSIONS_REQUEST_READ_CONTACTS);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+              && checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] { Manifest.permission.READ_CONTACTS }, PERMISSIONS_REQUEST_READ_CONTACTS);
         }
     }
 
     private void createAndAddContact() {
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
-                Intent i = new Intent(Intent.ACTION_INSERT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+              && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            Intent i = new Intent(Intent.ACTION_INSERT);
             i.setType(ContactsContract.Contacts.CONTENT_TYPE);
-            if (Integer.valueOf(Build.VERSION.SDK) > 14)
+            if (Integer.valueOf(Build.VERSION.SDK) > 14) {
                 i.putExtra("finishActivityOnSaveCompleted", true); // Fix for 4.0.3 +
+            }
             startActivityForResult(i, PICK_CONTACT_REQUEST);
-        }
-        else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, PERMISSIONS_REQUEST_READ_CONTACTS_FOR_ADD);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+              && checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] { Manifest.permission.READ_CONTACTS },
+                  PERMISSIONS_REQUEST_READ_CONTACTS_FOR_ADD);
         }
     }
 
     public void saveContactsListSharePref(Context context, List<Contact> contactListToShare) {
 
         SharedPreferences sharedPreferences = context.getSharedPreferences(SHARED_PREFS_NAME,
-                Context.MODE_PRIVATE);
+              Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         Gson gson = new Gson();
         String jsonContacts = gson.toJson(contactListToShare);
@@ -396,18 +397,19 @@ public class SettingsActivity extends AppCompatActivity {
         List<Contact> sharedContactList = new ArrayList<>();
 
         SharedPreferences sharedPreferences = context.getSharedPreferences(SHARED_PREFS_NAME,
-                Context.MODE_PRIVATE);
+              Context.MODE_PRIVATE);
 
         if (sharedPreferences.contains(CONTACTS)) {
             String jsonContacts = sharedPreferences.getString(CONTACTS, null);
             Gson gson = new Gson();
             Contact[] contactsArray = gson.fromJson(jsonContacts,
-                    Contact[].class);
+                  Contact[].class);
 
             sharedContactList = Arrays.asList(contactsArray);
             sharedContactList = new ArrayList<>(sharedContactList);
-        } else
+        } else {
             return (ArrayList<Contact>) sharedContactList;
+        }
         return (ArrayList<Contact>) sharedContactList;
     }
 
@@ -416,30 +418,31 @@ public class SettingsActivity extends AppCompatActivity {
         switch (requestCode) {
             case PERMISSIONS_REQUEST_READ_CONTACTS:
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                   readContact();
+                    readContact();
                 } else {
                     Toast.makeText(SettingsActivity.this, R.string.contacts_perm_accept, Toast.LENGTH_SHORT)
-                            .show();
+                          .show();
                 }
                 break;
             case PERMISSIONS_REQUEST_READ_CONTACTS_FOR_ADD:
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                   createAndAddContact();
+                    createAndAddContact();
                 } else {
                     Toast.makeText(SettingsActivity.this, R.string.contacts_perm_accept, Toast.LENGTH_SHORT)
-                        .show();
+                          .show();
                 }
                 break;
             case PERMISSIONS_REQUEST_SMS_LOCATION:
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED
-                    && grantResults[1] == PackageManager.PERMISSION_GRANTED
-                    && grantResults[2] == PackageManager.PERMISSION_GRANTED
-                    && checkDrawOverlayPermission()) {
+                      && grantResults[1] == PackageManager.PERMISSION_GRANTED
+                      && grantResults[2] == PackageManager.PERMISSION_GRANTED
+                      && checkDrawOverlayPermission()) {
                     startServiceSaveUI();
                     trackingSwitch.setChecked(trackingStatus);
                 } else {
-                    Toast.makeText(SettingsActivity.this, R.string.location_sms_windows_features_perm_accept, Toast.LENGTH_LONG)
-                        .show();
+                    Toast.makeText(SettingsActivity.this, R.string.location_sms_windows_features_perm_accept,
+                          Toast.LENGTH_LONG)
+                          .show();
                 }
                 break;
             default:
@@ -447,7 +450,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
-    private void savingTrackStatusToSharePref(boolean trackingStatus){
+    private void savingTrackStatusToSharePref(boolean trackingStatus) {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putBoolean(TRACKING_STATUS, trackingStatus);
         editor.commit();
@@ -457,7 +460,7 @@ public class SettingsActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (!Settings.canDrawOverlays(this)) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
+                      Uri.parse("package:" + getPackageName()));
                 startActivityForResult(intent, SYSTEM_ALERTS_REQUEST_CODE);
             }
         }
@@ -471,7 +474,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
     }
 
-    public void getContactDataFromUri(Uri uri){
+    public void getContactDataFromUri(Uri uri) {
         Cursor cursor = getContentResolver().query(uri, null, null, null, null);
         cursor.moveToFirst();
         ContentResolver cr = getContentResolver();
@@ -482,11 +485,11 @@ public class SettingsActivity extends AppCompatActivity {
         if (Integer.parseInt(cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER))) > 0) {
 
             Cursor pCur = cr.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null,
-                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                new String[]{contactID}, null);
+                  ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                  new String[] { contactID }, null);
             while (pCur.moveToNext()) {
                 phoneNumber = pCur.getString(
-                    pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
+                      pCur.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER));
             }
             pCur.close();
         }

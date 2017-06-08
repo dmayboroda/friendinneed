@@ -34,7 +34,6 @@ import android.support.annotation.WorkerThread;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AlertDialog;
-import android.support.v7.view.ContextThemeWrapper;
 import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.Window;
@@ -69,34 +68,30 @@ import okhttp3.Response;
 import static com.friendinneed.ua.friendinneed.BuildConfig.DEBUG;
 import static java.lang.Math.sqrt;
 
-/**
- * Created by Mayboroda on 8/30/16.
- */
-public class InneedService extends Service implements SensorEventListener, GoogleApiClient.ConnectionCallbacks {
+public class InNeedService extends Service implements SensorEventListener, GoogleApiClient.ConnectionCallbacks {
 
     public static final String SOS_MESSAGE_PREFIX = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:";
     public static final String SOS_MESSAGE_NO_LOCATION = "I need Your help, call me please.";
+
     private GoogleApiClient mGoogleApiClient;
     private static final boolean isCheckDialogVersion = true;
     public static final int MILLIS_IN_SECOND = 1000;
     private static AtomicBoolean isCheckingData = new AtomicBoolean(false);
     private static AtomicBoolean isDetecting = new AtomicBoolean(false);
-    private static final String TAG = InneedService.class.getSimpleName();
+    private static final String TAG = InNeedService.class.getSimpleName();
     private static final String ACTION_START = TAG + "_start";
     private static final String ACTION_STOP = TAG + "_stop";
     private static final String ACTION_START_DETECTION = TAG + "_start_detection";
     private static final String ACTION_STOP_DETECTION = TAG + "_stop_detection";
 
     public static final String FENCE_RECEIVER_ACTION =
-            BuildConfig.APPLICATION_ID + ".FENCE_RECEIVER_ACTION";
+          BuildConfig.APPLICATION_ID + ".FENCE_RECEIVER_ACTION";
 
     public static final String START_FENCE_KEY = "start_fence_key";
 
     private static final int SERVICE_ID = 0110;
 
-    public static final double GRAVITY = 9.8;
-    private static final double G_POINT_MIN = 6.0 * GRAVITY;
-    private static final double G_POINT_MAX = 10.0 * GRAVITY;
+
     private static final double EPSILON = 0.0;
     private static final int QUEUE_TIMEOUT_MILLIS = 2000;
     private static final int DEFAULT_WAIT_TIME = 15;
@@ -107,6 +102,7 @@ public class InneedService extends Service implements SensorEventListener, Googl
     private static final int PORT = 5000;
     private OkHttpClient client;
     private final DataQueue queue = new DataQueue(QUEUE_TIMEOUT_MILLIS);
+    private JoltCalculator joltCalculator;
     private AsyncTask<Integer, Void, Void> requestSendAsyncTask = getSendDataTask();
     private AsyncTask<Void, Void, Void> requestCheckAsyncTask = getSendCheckDataTask();
     private StillStateReceiver mFenceReceiver;
@@ -134,7 +130,7 @@ public class InneedService extends Service implements SensorEventListener, Googl
     };
     private DialogInterface.OnClickListener onSendFallClickListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
-            if (userCountDownTimer!=null) {
+            if (userCountDownTimer != null) {
                 userCountDownTimer.cancel();
             }
             callForHelp();
@@ -144,7 +140,7 @@ public class InneedService extends Service implements SensorEventListener, Googl
     };
     private DialogInterface.OnClickListener onDiscardFallClickListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
-            if (userCountDownTimer!=null) {
+            if (userCountDownTimer != null) {
                 userCountDownTimer.cancel();
             }
             dialog.dismiss();
@@ -173,29 +169,34 @@ public class InneedService extends Service implements SensorEventListener, Googl
         }
     };
 
-    public InneedService() {
+    public InNeedService() {
+    }
+
+    @Override public void onCreate() {
+        super.onCreate();
+        joltCalculator = new JoltCalculator(queue);
     }
 
     public static void startInneedService(Context context) {
-        Intent intent = new Intent(context, InneedService.class);
+        Intent intent = new Intent(context, InNeedService.class);
         intent.setAction(ACTION_START);
         context.startService(intent);
     }
 
     public static void stopInnedService(Context context) {
-        Intent intent = new Intent(context, InneedService.class);
+        Intent intent = new Intent(context, InNeedService.class);
         intent.setAction(ACTION_STOP);
         context.startService(intent);
     }
 
     public static void suspendInnedService(Context context) {
-        Intent intent = new Intent(context, InneedService.class);
+        Intent intent = new Intent(context, InNeedService.class);
         intent.setAction(ACTION_STOP_DETECTION);
         context.startService(intent);
     }
 
     public static void resumeInnedService(Context context) {
-        Intent intent = new Intent(context, InneedService.class);
+        Intent intent = new Intent(context, InNeedService.class);
         intent.setAction(ACTION_START_DETECTION);
         context.startService(intent);
     }
@@ -224,9 +225,9 @@ public class InneedService extends Service implements SensorEventListener, Googl
 
     private void start() {
         mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(Awareness.API)
-                .addConnectionCallbacks(this)
-                .build();
+              .addApi(Awareness.API)
+              .addConnectionCallbacks(this)
+              .build();
         OkHttpClient.Builder clientBuilder = new OkHttpClient.Builder();
         clientBuilder.connectTimeout(20000, TimeUnit.MILLISECONDS);
         clientBuilder.retryOnConnectionFailure(false);
@@ -266,21 +267,21 @@ public class InneedService extends Service implements SensorEventListener, Googl
             unregisterReceiver(mFenceReceiver);
         }
         Awareness.FenceApi.updateFences(
-                mGoogleApiClient,
-                new FenceUpdateRequest.Builder()
-                        .removeFence(START_FENCE_KEY)
-                        .build())
-                .setResultCallback(new ResultCallback<Status>() {
-                    @Override
-                    public void onResult(@NonNull Status status) {
-                        mGoogleApiClient.disconnect();
-                        if (status.isSuccess()) {
-                            Log.i(TAG, "Fence was successfully unregistered.");
-                        } else {
-                            Log.e(TAG, "Fence could not be unregistered: " + status);
-                        }
-                    }
-                });
+              mGoogleApiClient,
+              new FenceUpdateRequest.Builder()
+                    .removeFence(START_FENCE_KEY)
+                    .build())
+              .setResultCallback(new ResultCallback<Status>() {
+                  @Override
+                  public void onResult(@NonNull Status status) {
+                      mGoogleApiClient.disconnect();
+                      if (status.isSuccess()) {
+                          Log.i(TAG, "Fence was successfully unregistered.");
+                      } else {
+                          Log.e(TAG, "Fence could not be unregistered: " + status);
+                      }
+                  }
+              });
         mSensorManager.requestTriggerSensor(mTriggerEventListener, mSignificantMotionSensor);
         isDetecting.set(false);
     }
@@ -293,26 +294,26 @@ public class InneedService extends Service implements SensorEventListener, Googl
 
     private Notification createNotification() {
         return new NotificationCompat.Builder(this)
-                .setContentTitle(getString(R.string.is_protecting_you))
-                .setSmallIcon(R.drawable.ic_notif)
-                .setLargeIcon(createBitmap())
-                .setContentIntent(createIntent())
-                .setOngoing(true)
-                .build();
+              .setContentTitle(getString(R.string.is_protecting_you))
+              .setSmallIcon(R.drawable.ic_notif)
+              .setLargeIcon(createBitmap())
+              .setContentIntent(createIntent())
+              .setOngoing(true)
+              .build();
     }
 
     private PendingIntent createIntent() {
         Intent intent = new Intent(this, SettingsActivity.class);
         intent.setAction(SettingsActivity.SERVICE_ACTION);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+              | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         return PendingIntent.getActivity(this, 0, intent, 0);
     }
 
     @WorkerThread
     private Bitmap createBitmap() {
         Bitmap bitmap = BitmapFactory.decodeResource
-                (getResources(), R.drawable.ic_notif);
+              (getResources(), R.drawable.ic_notif);
         return Bitmap.createScaledBitmap(bitmap, 128, 128, false);
     }
 
@@ -327,9 +328,9 @@ public class InneedService extends Service implements SensorEventListener, Googl
         DataSampleRequest dataSampleRequest = new DataSampleRequest(dataSamples, label);
         RequestBody body = RequestBody.create(JSON, new Gson().toJson(dataSampleRequest));
         Request request = new Request.Builder()
-                .url(url)
-                .post(body)
-                .build();
+              .url(url)
+              .post(body)
+              .build();
 
         Response response = client.newCall(request).execute();
         return response.body().string();
@@ -347,7 +348,7 @@ public class InneedService extends Service implements SensorEventListener, Googl
 
     @Nullable
     private AlertDialog getDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(new ContextThemeWrapper(this, R.style.alertDialog));
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.alertDialog);
         builder.setTitle(R.string.dialog_title);
         builder.setPositiveButton(R.string.send, onSendClickListener);
         builder.setNegativeButton(R.string.discard, onDiscardClickListener);
@@ -363,7 +364,7 @@ public class InneedService extends Service implements SensorEventListener, Googl
 
     @Nullable
     private AlertDialog getCountdownDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(new ContextThemeWrapper(this, R.style.alertDialog));
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.alertDialog);
         builder.setTitle(R.string.dialog_title);
         builder.setPositiveButton(R.string.send, onSendFallClickListener);
         builder.setNegativeButton(R.string.discard, onDiscardFallClickListener);
@@ -379,60 +380,73 @@ public class InneedService extends Service implements SensorEventListener, Googl
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        float accX, accY, accZ, gyroX, gyroY, gyroZ;
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            accX = event.values[0];
-            accY = event.values[1];
-            accZ = event.values[2];
-            final DataSample sampleAccelerometer = new AccelerometerDataSample(accX, accY, accZ);
-            queue.addSample(sampleAccelerometer);
-            if (DEBUG) {
-                Log.v(TAG, "queue size: " + String.valueOf(queue.size()));
-            }
-            if (requestSendAsyncTask.getStatus() != AsyncTask.Status.RUNNING ||
-                    requestCheckAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
-                if (!isCheckingData.get() && checkForJolt(accX, accY, accZ)) {
-//                    Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
-                    if (isCheckDialogVersion) {
-                        if (!dialog.isShowing()) {
-                            dialog.show();
-                            mVibrator.vibrate(800);
-                        }
-                    } else {
-                        fallMaybeHappen();
+            onAccelerometerSensorChanged(event);
+        } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
+            onGyroSensorChanged(event);
+        }
+    }
+
+    private void onAccelerometerSensorChanged(SensorEvent event) {
+        float accX;
+        float accY;
+        float accZ;
+        accX = event.values[0];
+        accY = event.values[1];
+        accZ = event.values[2];
+        final DataSample sampleAccelerometer = new AccelerometerDataSample(accX, accY, accZ);
+        queue.addSample(sampleAccelerometer);
+        if (DEBUG) {
+            Log.v(TAG, "queue size: " + String.valueOf(queue.size()));
+        }
+        if (requestSendAsyncTask.getStatus() != AsyncTask.Status.RUNNING ||
+              requestCheckAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
+            if (!isCheckingData.get() && joltCalculator.checkForJolt(accX, accY, accZ)) {
+                //                    Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
+                if (isCheckDialogVersion) {
+                    if (!dialog.isShowing()) {
+                        dialog.show();
+                        mVibrator.vibrate(800);
                     }
+                } else {
+                    fallMaybeHappen();
                 }
             }
-        } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
-            gyroX = event.values[0];
-            gyroY = event.values[1];
-            gyroZ = event.values[2];
-
-            // Calculate the angular speed of the sample
-            double omegaMagnitude = sqrt(gyroX * gyroX + gyroY * gyroY + gyroZ * gyroZ);
-
-            // Normalize the rotation vector if it's big enough to get the axis
-            // (that is, EPSILON should represent your maximum allowable margin of error)
-            if (omegaMagnitude > EPSILON) {
-                gyroX /= omegaMagnitude;
-                gyroY /= omegaMagnitude;
-                gyroZ /= omegaMagnitude;
-            }
-            final DataSample sampleGyroscope = new GyroscopeDataSample(gyroX, gyroY, gyroZ);
-            queue.addSample(sampleGyroscope);
         }
+    }
+
+    private void onGyroSensorChanged(SensorEvent event) {
+        float gyroX;
+        float gyroY;
+        float gyroZ;
+        gyroX = event.values[0];
+        gyroY = event.values[1];
+        gyroZ = event.values[2];
+
+        // Calculate the angular speed of the sample
+        double omegaMagnitude = sqrt(gyroX * gyroX + gyroY * gyroY + gyroZ * gyroZ);
+
+        // Normalize the rotation vector if it's big enough to get the axis
+        // (that is, EPSILON should represent your maximum allowable margin of error)
+        if (omegaMagnitude > EPSILON) {
+            gyroX /= omegaMagnitude;
+            gyroY /= omegaMagnitude;
+            gyroZ /= omegaMagnitude;
+        }
+        final DataSample sampleGyroscope = new GyroscopeDataSample(gyroX, gyroY, gyroZ);
+        queue.addSample(sampleGyroscope);
     }
 
     private void fallMaybeHappen() {
         isCheckingData.set(true);
         inactivityFirstTimer = new CountDownTimer(getSharedPreferences(
-                SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
-                getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
-                MILLIS_IN_SECOND) {
+              SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
+              getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
+              MILLIS_IN_SECOND) {
             @Override
             public void onTick(long millisUntilFinished) {
                 Log.d(TAG, "inactivityFirstTimer is ticking: " +
-                        (millisUntilFinished/MILLIS_IN_SECOND));
+                      (millisUntilFinished / MILLIS_IN_SECOND));
             }
 
             @Override
@@ -452,7 +466,10 @@ public class InneedService extends Service implements SensorEventListener, Googl
     private void callForHelp() {
         LocationManager locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
         Log.i(TAG, "callForHelp");
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+              != PackageManager.PERMISSION_GRANTED
+              && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+              != PackageManager.PERMISSION_GRANTED) {
             // we never reach here, but studio is asking us to leave this code here
             return;
         }
@@ -460,14 +477,14 @@ public class InneedService extends Service implements SensorEventListener, Googl
         String message;
         if (location != null) {
             message = SOS_MESSAGE_PREFIX + location.getLatitude() + "," + location.getLongitude();
-
         } else {
             if (canToggleGPS()) {
                 turnGPSOn();
                 location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
                 message = SOS_MESSAGE_PREFIX + location.getLatitude() + "," + location.getLongitude();
             } else {
-                message = SOS_MESSAGE_NO_LOCATION;//"SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
+                message =
+                      SOS_MESSAGE_NO_LOCATION;//"SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:" + location.getLatitude() + "," + location.getLongitude();
             }
         }
         SmsManager sms = SmsManager.getDefault();
@@ -484,15 +501,6 @@ public class InneedService extends Service implements SensorEventListener, Googl
         }
     }
 
-    private boolean checkForJolt(float accX, float accY, float accZ) {
-        double gValue = calculateGValue(accX, accY, accZ);
-        return G_POINT_MIN < gValue && gValue < G_POINT_MAX;
-    }
-
-    public static double calculateGValue(float accX, float accY, float accZ) {
-        float sum = (accX * accX) + (accY * accY) + (accZ * accZ);
-        return Math.sqrt(Double.parseDouble(Float.toString(sum)));
-    }
 
     private AsyncTask<Integer, Void, Void> getSendDataTask() {
         return new AsyncTask<Integer, Void, Void>() {
@@ -527,7 +535,8 @@ public class InneedService extends Service implements SensorEventListener, Googl
             @Override
             protected Void doInBackground(Void... params) {
                 try {
-                    response = postDataQueueSamples(BASE_URL + ":" + PORT + CHECK_FALL_ENDPOINT, queue.dump(), 0); //label does not matter here
+                    response = postDataQueueSamples(BASE_URL + ":" + PORT + CHECK_FALL_ENDPOINT, queue.dump(),
+                          0); //label does not matter here
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -545,14 +554,15 @@ public class InneedService extends Service implements SensorEventListener, Googl
                         mVibrator.vibrate(800);
 
                         userCountDownTimer = new CountDownTimer(getSharedPreferences(
-                                SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
-                                getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
-                                MILLIS_IN_SECOND) {
+                              SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
+                              getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
+                              MILLIS_IN_SECOND) {
                             @Override
                             public void onTick(long millisUntilFinished) {
-                                countDownDialog.setTitle(String.format(getString(R.string.dialog_title_formatted), (millisUntilFinished/MILLIS_IN_SECOND)));
+                                countDownDialog.setTitle(String.format(getString(R.string.dialog_title_formatted),
+                                      (millisUntilFinished / MILLIS_IN_SECOND)));
                                 Log.d(TAG, "userCountDownTimer is ticking: " +
-                                        (millisUntilFinished/MILLIS_IN_SECOND));
+                                      (millisUntilFinished / MILLIS_IN_SECOND));
                             }
 
                             @Override
@@ -564,7 +574,8 @@ public class InneedService extends Service implements SensorEventListener, Googl
                             }
                         }.start();
 
-                        mSensorManager.requestTriggerSensor(mCountdownOffTriggerEventListener, mSignificantMotionSensor);
+                        mSensorManager.requestTriggerSensor(mCountdownOffTriggerEventListener,
+                              mSignificantMotionSensor);
                     } else {
                         isCheckingData.set(false);
                     }
@@ -586,23 +597,23 @@ public class InneedService extends Service implements SensorEventListener, Googl
         String FENCE_KEY = "fence_key";
         startIntent.putExtra(FENCE_KEY, START_FENCE_KEY);
         PendingIntent mStartPendingIntent =
-                PendingIntent.getBroadcast(InneedService.this, 0, startIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+              PendingIntent.getBroadcast(InNeedService.this, 0, startIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         Awareness.FenceApi.updateFences(
-                mGoogleApiClient,
-                new FenceUpdateRequest.Builder()
-                        .addFence(START_FENCE_KEY, stillStartFence, mStartPendingIntent)
-                        .build())
-                .setResultCallback(new ResultCallback<Status>() {
-                    @Override
-                    public void onResult(@NonNull Status status) {
-                        if (status.isSuccess()) {
-                            Log.i(TAG, "Fence was successfully registered.");
-                        } else {
-                            Log.e(TAG, "Fence could not be registered: " + status);
-                        }
-                    }
-                });
+              mGoogleApiClient,
+              new FenceUpdateRequest.Builder()
+                    .addFence(START_FENCE_KEY, stillStartFence, mStartPendingIntent)
+                    .build())
+              .setResultCallback(new ResultCallback<Status>() {
+                  @Override
+                  public void onResult(@NonNull Status status) {
+                      if (status.isSuccess()) {
+                          Log.i(TAG, "Fence was successfully registered.");
+                      } else {
+                          Log.e(TAG, "Fence could not be registered: " + status);
+                      }
+                  }
+              });
     }
 
     @Override
@@ -611,19 +622,19 @@ public class InneedService extends Service implements SensorEventListener, Googl
     }
 
     private boolean canToggleGPS() {
-        PackageManager pacman = getPackageManager();
+        PackageManager packageManager = getPackageManager();
         PackageInfo pacInfo = null;
 
         try {
-            pacInfo = pacman.getPackageInfo("com.android.settings", PackageManager.GET_RECEIVERS);
+            pacInfo = packageManager.getPackageInfo("com.android.settings", PackageManager.GET_RECEIVERS);
         } catch (PackageManager.NameNotFoundException e) {
             return false; //package not found
         }
 
-        if(pacInfo != null){
-            for(ActivityInfo actInfo : pacInfo.receivers){
+        if (pacInfo != null) {
+            for (ActivityInfo actInfo : pacInfo.receivers) {
                 //test if recevier is exported. if so, we can toggle GPS.
-                if(actInfo.name.equals("com.android.settings.widget.SettingsAppWidgetProvider") && actInfo.exported){
+                if (actInfo.name.equals("com.android.settings.widget.SettingsAppWidgetProvider") && actInfo.exported) {
                     return true;
                 }
             }
@@ -632,10 +643,10 @@ public class InneedService extends Service implements SensorEventListener, Googl
         return false; //default
     }
 
-    private void turnGPSOn(){
+    private void turnGPSOn() {
         String provider = Settings.Secure.getString(getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
 
-        if(!provider.contains("gps")){ //if gps is disabled
+        if (!provider.contains("gps")) { //if gps is disabled
             final Intent poke = new Intent();
             poke.setClassName("com.android.settings", "com.android.settings.widget.SettingsAppWidgetProvider");
             poke.addCategory(Intent.CATEGORY_ALTERNATIVE);
@@ -644,10 +655,10 @@ public class InneedService extends Service implements SensorEventListener, Googl
         }
     }
 
-    private void turnGPSOff(){
+    private void turnGPSOff() {
         String provider = Settings.Secure.getString(getContentResolver(), Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
 
-        if(provider.contains("gps")){ //if gps is enabled
+        if (provider.contains("gps")) { //if gps is enabled
             final Intent poke = new Intent();
             poke.setClassName("com.android.settings", "com.android.settings.widget.SettingsAppWidgetProvider");
             poke.addCategory(Intent.CATEGORY_ALTERNATIVE);
@@ -655,5 +666,4 @@ public class InneedService extends Service implements SensorEventListener, Googl
             sendBroadcast(poke);
         }
     }
-
 }

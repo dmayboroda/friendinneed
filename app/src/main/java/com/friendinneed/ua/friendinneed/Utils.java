@@ -7,13 +7,10 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 
-/**
- * Created by mymac on 9/25/16.
- */
 
-public class Utils {
+class Utils {
 
-    public static Bitmap getCroppedBitmap(Bitmap bitmap) {
+    static Bitmap getCroppedBitmap(Bitmap bitmap) {
         Bitmap output = Bitmap.createBitmap(bitmap.getWidth(),
                 bitmap.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(output);
