@@ -74,7 +74,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     public static final String SOS_MESSAGE_NO_LOCATION = "I need Your help, call me please.";
 
     private GoogleApiClient mGoogleApiClient;
-    private static final boolean isCheckDialogVersion = true;
+    private static final boolean DATA_COLLECTION_MODE = true;
     public static final int MILLIS_IN_SECOND = 1000;
     private static AtomicBoolean isCheckingData = new AtomicBoolean(false);
     private static AtomicBoolean isDetecting = new AtomicBoolean(false);
@@ -110,7 +110,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     private Sensor mAccelerometerSensor;
     private Sensor mGyroSensor;
     private Sensor mSignificantMotionSensor;
-    AlertDialog dialog;
+    AlertDialog dataCollectionDialog;
     AlertDialog countDownDialog;
     Vibrator mVibrator;
     private CountDownTimer userCountDownTimer;
@@ -163,7 +163,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
             resumeInnedService(getApplicationContext());
             if (userCountDownTimer != null) {
                 userCountDownTimer.cancel();
-                dialog.dismiss();
+                dataCollectionDialog.dismiss();
                 isCheckingData.set(false);
             }
         }
@@ -232,7 +232,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
         clientBuilder.connectTimeout(20000, TimeUnit.MILLISECONDS);
         clientBuilder.retryOnConnectionFailure(false);
         client = clientBuilder.build();
-        dialog = getDialog();
+        dataCollectionDialog = getDataCollectionDialog();
         countDownDialog = getCountdownDialog();
         mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -347,7 +347,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     }
 
     @Nullable
-    private AlertDialog getDialog() {
+    private AlertDialog getDataCollectionDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.alertDialog);
         builder.setTitle(R.string.dialog_title);
         builder.setPositiveButton(R.string.send, onSendClickListener);
@@ -403,9 +403,9 @@ public class InNeedService extends Service implements SensorEventListener, Googl
               requestCheckAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
             if (!isCheckingData.get() && joltCalculator.checkForJolt(accX, accY, accZ)) {
                 //                    Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
-                if (isCheckDialogVersion) {
-                    if (!dialog.isShowing()) {
-                        dialog.show();
+                if (DATA_COLLECTION_MODE) {
+                    if (!dataCollectionDialog.isShowing()) {
+                        dataCollectionDialog.show();
                         mVibrator.vibrate(800);
                     }
                 } else {
@@ -509,7 +509,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
             @Override
             protected Void doInBackground(Integer... params) {
                 try {
-                    response = postDataQueueSamples(BASE_URL + ":" + PORT, queue.dump(), params[0]);
+                    response = postDataQueueSamples(BASE_URL + ":" + PORT, queue.getDataSamples(), params[0]);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -535,7 +535,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
             @Override
             protected Void doInBackground(Void... params) {
                 try {
-                    response = postDataQueueSamples(BASE_URL + ":" + PORT + CHECK_FALL_ENDPOINT, queue.dump(),
+                    response = postDataQueueSamples(BASE_URL + ":" + PORT + CHECK_FALL_ENDPOINT, queue.getDataSamples(),
                           0); //label does not matter here
                 } catch (IOException e) {
                     e.printStackTrace();

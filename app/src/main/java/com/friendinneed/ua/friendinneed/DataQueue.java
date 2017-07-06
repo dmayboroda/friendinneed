@@ -12,13 +12,14 @@ class DataQueue {
     private long timeout;
     private final LinkedList<DataSample> dataQueue = new LinkedList<>();
     private final LinkedList<DataSample> dataQueueBuffer = new LinkedList<>();
+    private DataSample[] dataSamples;
 
     DataQueue(long timeout) {
         this.timeout = timeout;
         isDumping.set(false);
     }
 
-    public DataSample[] dump() {
+    DataSample[] dump() {
         isDumping.set(true);
         DataSample[] dataSampleArray = dataQueue.toArray(new DataSample[dataQueue.size()]);
         isDumping.lazySet(false);
@@ -49,5 +50,14 @@ class DataQueue {
 
     public long getTimeElapsedSinceStartPercents() {
         return 100 * (dataQueue.getLast().getTimestamp() - dataQueue.getFirst().getTimestamp()) / timeout;
+    }
+
+    public void prepareSample() {
+        dataSamples = dump();
+        clear();
+    }
+
+    public DataSample[] getDataSamples() {
+        return dataSamples;
     }
 }

@@ -21,7 +21,7 @@ import static org.junit.Assert.assertNotEquals;
  * To work on unit tests, switch the Test Artifact in the Build Variants view.
  */
 public class DataQueueUnitTest {
-    private static final int QUEUE_TIMEOUT_TWO_SEC_IN_MILLIS = 2000;
+    private static final int QUEUE_TIMEOUT_TWO_SEC_IN_MILLIS = 1000;
     private static final double DOUBLE_DELTA = 0.0d;
     private final float initAccX = 0.0001f;
     private final float initAccY = 0.0002f;

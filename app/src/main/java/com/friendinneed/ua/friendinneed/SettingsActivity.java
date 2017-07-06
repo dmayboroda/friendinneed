@@ -41,7 +41,6 @@ import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
 import com.androidplot.xy.SimpleXYSeries;
 import com.androidplot.xy.XYPlot;
-import com.androidplot.xy.XYStepMode;
 import com.friendinneed.ua.friendinneed.model.Contact;
 import com.google.gson.Gson;
 
@@ -198,7 +197,7 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
         XYPlot accelerometerHistoryPlot = new XYPlot(this, "accelerometer", Plot.RenderMode.USE_BACKGROUND_THREAD);
-        accelerometerHistoryPlot.getGraphWidget().setShowRangeLabels(true);
+        //accelerometerHistoryPlot.getGraph().setShowRangeLabels(true);
 
         final SimpleXYSeries xHistorySeries = new SimpleXYSeries("X");
         final SimpleXYSeries yHistorySeries = new SimpleXYSeries("Y");
@@ -207,8 +206,8 @@ public class SettingsActivity extends AppCompatActivity {
         yHistorySeries.useImplicitXVals();
         zHistorySeries.useImplicitXVals();
 
-        accelerometerHistoryPlot.setGridPadding(100, 50, 0, 0);
-        accelerometerHistoryPlot.setRangeStep(XYStepMode.INCREMENT_BY_VAL, 5.0d);
+        //accelerometerHistoryPlot.setGridPadding(100, 50, 0, 0);
+        //accelerometerHistoryPlot.setRangeStep(XYStepMode.INCREMENT_BY_VAL, 5.0d);
 
         accelerometerHistoryPlot.setDomainBoundaries(0, 500,
               BoundaryMode.FIXED);             // number of points to plot in history
@@ -283,6 +282,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         contentWrapper.addView(gValueTextView);
         contentWrapper.addView(accelerometerHistoryPlot);
+        findViewById(R.id.contacts_added_list).setVisibility(View.GONE);
         redrawer.start();
     }
 

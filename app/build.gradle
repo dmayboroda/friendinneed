@@ -18,6 +18,8 @@ android {
 
         debug {
             resValue "string", "api_key", apiKey
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
         release {
             resValue "string", "api_key", apiKey
@@ -30,7 +32,7 @@ android {
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.12'
-    debugCompile 'com.androidplot:androidplot-core:0.9.8'
+    debugCompile "com.androidplot:androidplot-core:1.4.3"
     compile 'com.android.support:appcompat-v7:25.3.1'
     compile 'com.android.support:design:25.3.1'
     compile 'com.squareup.okhttp3:okhttp:3.2.0'
