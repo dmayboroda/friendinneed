@@ -46,9 +46,9 @@ public class JoltCalculator {
 
     double gValue = calculateGValue(accX, accY, accZ);
     long filledQueuePercentage = queue.getTimeElapsedSinceStartPercents();
-    if (filledQueuePercentage<95)
-    Log.v(TAG, "current vector: " + gValue + ", state: " + joltState.name() + " errors: "+joltErrors + " filled % " +
-        filledQueuePercentage);
+    //if (filledQueuePercentage<95)
+    //Log.v(TAG, "current vector: " + gValue + ", state: " + joltState.name() + " errors: "+joltErrors + " filled % " +
+    //    filledQueuePercentage);
     if (joltState == JoltState.FREE_FALL) {
       if (!isFreeFall(gValue)) {
         if (filledQueuePercentage > 20) {

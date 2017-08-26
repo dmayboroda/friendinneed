@@ -74,7 +74,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     public static final String SOS_MESSAGE_NO_LOCATION = "I need Your help, call me please.";
 
     private GoogleApiClient mGoogleApiClient;
-    private static final boolean DATA_COLLECTION_MODE = true;
+    private boolean labelingEnabled = true;
     public static final int MILLIS_IN_SECOND = 1000;
     private static AtomicBoolean isCheckingData = new AtomicBoolean(false);
     private static AtomicBoolean isDetecting = new AtomicBoolean(false);
@@ -116,16 +116,18 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     private CountDownTimer userCountDownTimer;
     private CountDownTimer inactivityFirstTimer;
 
-    private DialogInterface.OnClickListener onSendClickListener = new DialogInterface.OnClickListener() {
+    private DialogInterface.OnClickListener onSendDataCollectionDialogClickListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
             sendDataRequest(1);
             dialog.dismiss();
+            resumeInnedService(getApplicationContext());
         }
     };
-    private DialogInterface.OnClickListener onDiscardClickListener = new DialogInterface.OnClickListener() {
+    private DialogInterface.OnClickListener onDiscardDataCollectionDialogClickListener = new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
             sendDataRequest(0);
             dialog.dismiss();
+            resumeInnedService(getApplicationContext());
         }
     };
     private DialogInterface.OnClickListener onSendFallClickListener = new DialogInterface.OnClickListener() {
@@ -147,7 +149,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
             resumeInnedService(getApplicationContext());
         }
     };
-    private TriggerEventListener mTriggerEventListener = new TriggerEventListener() {
+    private TriggerEventListener mTriggerInactivityTimerCanceller = new TriggerEventListener() {
         @Override
         public void onTrigger(TriggerEvent event) {
             resumeInnedService(getApplicationContext());
@@ -157,13 +159,24 @@ public class InNeedService extends Service implements SensorEventListener, Googl
             }
         }
     };
+    // TODO this one shoud be used to sop detecting while still
+    private TriggerEventListener mTriggerEventListener = new TriggerEventListener() {
+        @Override
+        public void onTrigger(TriggerEvent event) {
+            resumeInnedService(getApplicationContext());
+            //if (inactivityFirstTimer != null) {
+            //    inactivityFirstTimer.cancel();
+            //    isCheckingData.set(false);
+            //}
+        }
+    };
     private TriggerEventListener mCountdownOffTriggerEventListener = new TriggerEventListener() {
         @Override
         public void onTrigger(TriggerEvent event) {
             resumeInnedService(getApplicationContext());
             if (userCountDownTimer != null) {
                 userCountDownTimer.cancel();
-                dataCollectionDialog.dismiss();
+                countDownDialog.dismiss();
                 isCheckingData.set(false);
             }
         }
@@ -224,6 +237,9 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     }
 
     private void start() {
+        labelingEnabled = getSharedPreferences(
+            SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
+            getBoolean(SettingsActivity.LABELING_ENABLED, false);
         mGoogleApiClient = new GoogleApiClient.Builder(this)
               .addApi(Awareness.API)
               .addConnectionCallbacks(this)
@@ -251,7 +267,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
         mGoogleApiClient.connect();
         mSensorManager.registerListener(this, mAccelerometerSensor, SensorManager.SENSOR_DELAY_FASTEST);
         mSensorManager.registerListener(this, mGyroSensor, SensorManager.SENSOR_DELAY_FASTEST);
-        mSensorManager.requestTriggerSensor(mTriggerEventListener, mSignificantMotionSensor);
+        mSensorManager.cancelTriggerSensor(mTriggerEventListener, mSignificantMotionSensor);
         isDetecting.set(true);
     }
 
@@ -266,6 +282,14 @@ public class InNeedService extends Service implements SensorEventListener, Googl
         if (mFenceReceiver != null) {
             unregisterReceiver(mFenceReceiver);
         }
+
+        mSensorManager.requestTriggerSensor(mTriggerEventListener, mSignificantMotionSensor);
+        isDetecting.set(false);
+    }
+
+    private void stop() {
+        stopDetection();
+        stopForeground(true);
         Awareness.FenceApi.updateFences(
               mGoogleApiClient,
               new FenceUpdateRequest.Builder()
@@ -282,13 +306,6 @@ public class InNeedService extends Service implements SensorEventListener, Googl
                       }
                   }
               });
-        mSensorManager.requestTriggerSensor(mTriggerEventListener, mSignificantMotionSensor);
-        isDetecting.set(false);
-    }
-
-    private void stop() {
-        stopDetection();
-        stopForeground(true);
         stopSelf();
     }
 
@@ -349,9 +366,9 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     @Nullable
     private AlertDialog getDataCollectionDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.alertDialog);
-        builder.setTitle(R.string.dialog_title);
-        builder.setPositiveButton(R.string.send, onSendClickListener);
-        builder.setNegativeButton(R.string.discard, onDiscardClickListener);
+        builder.setTitle(R.string.dialog_labeling_title);
+        builder.setPositiveButton(R.string.yes_txt, onSendDataCollectionDialogClickListener);
+        builder.setNegativeButton(R.string.no_txt, onDiscardDataCollectionDialogClickListener);
         builder.setCancelable(false);
         AlertDialog dialog = builder.create();
         Window dialogWindow = dialog.getWindow();
@@ -397,13 +414,13 @@ public class InNeedService extends Service implements SensorEventListener, Googl
         final DataSample sampleAccelerometer = new AccelerometerDataSample(accX, accY, accZ);
         queue.addSample(sampleAccelerometer);
         if (DEBUG) {
-            Log.v(TAG, "queue size: " + String.valueOf(queue.size()));
+            //Log.v(TAG, "queue size: " + String.valueOf(queue.size()));
         }
         if (requestSendAsyncTask.getStatus() != AsyncTask.Status.RUNNING ||
               requestCheckAsyncTask.getStatus() != AsyncTask.Status.RUNNING) {
             if (!isCheckingData.get() && joltCalculator.checkForJolt(accX, accY, accZ)) {
                 //                    Log.v(TAG, "accX=" + accX + ", accY=" + accY + ", accZ=" + accZ);
-                if (DATA_COLLECTION_MODE) {
+                if (labelingEnabled) {
                     if (!dataCollectionDialog.isShowing()) {
                         dataCollectionDialog.show();
                         mVibrator.vibrate(800);
@@ -451,11 +468,12 @@ public class InNeedService extends Service implements SensorEventListener, Googl
 
             @Override
             public void onFinish() {
+                mSensorManager.cancelTriggerSensor(mTriggerInactivityTimerCanceller, mSignificantMotionSensor);
                 sendCheckRequest();
             }
         }.start();
 
-        mSensorManager.requestTriggerSensor(mTriggerEventListener, mSignificantMotionSensor);
+        mSensorManager.requestTriggerSensor(mTriggerInactivityTimerCanceller, mSignificantMotionSensor);
     }
 
     @Override
@@ -568,6 +586,8 @@ public class InNeedService extends Service implements SensorEventListener, Googl
                             @Override
                             public void onFinish() {
                                 callForHelp();
+                                mSensorManager.cancelTriggerSensor(mCountdownOffTriggerEventListener,
+                                    mSignificantMotionSensor);
                                 countDownDialog.dismiss();
                                 isCheckingData.set(false);
                                 cancel();

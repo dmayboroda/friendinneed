@@ -10,6 +10,7 @@
     <string name="send">Send alarm</string>
     <string name="discard">Discard</string>
     <string name="dialog_title">Fall detected</string>
+    <string name="dialog_labeling_title">was it a real fall?</string>
     <string name="choose_contact">Choose contact</string>
     <string name="create_add_contact">Create contact</string>
     <string name="dialog_title_formatted">Fall detected\nCAll for help in: %d sec</string>
@@ -28,4 +29,5 @@
     <string name="sms_perm_accept">Please accept SMS SEDNDING ACCESS permissions</string>
     <string name="location_sms_windows_features_perm_accept">Please accept LOCATION, SMS SENDING ACCESS and WINDOWS FEATURES permissions</string>
     <string name="is_protecting_you">FriendInNeed is protecting You!</string>
+  <string name="turn_on_labeling">Labeling mode</string>
 </resources>

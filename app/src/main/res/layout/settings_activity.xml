@@ -33,6 +33,30 @@
 
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/labeling_switch_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:paddingTop="7dp"
+        android:paddingBottom="7dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="left"
+            android:textColor="@android:color/black"
+            android:text="@string/turn_on_labeling"
+            android:textSize="17sp"/>
+
+        <android.support.v7.widget.SwitchCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/labeling_switch"/>
+
+    </LinearLayout>
+
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"

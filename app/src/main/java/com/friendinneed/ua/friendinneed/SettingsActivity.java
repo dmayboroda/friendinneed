@@ -52,6 +52,7 @@ import java.util.List;
 public class SettingsActivity extends AppCompatActivity {
 
     public static final String SERVICE_ACTION = SettingsActivity.class.getSimpleName() + "_service";
+    public static final String LABELING_ENABLED = "labeling_enabled";
     private Boolean trackingStatus = false;
     private SharedPreferences prefs;
     private SwitchCompat trackingSwitch;
@@ -80,6 +81,7 @@ public class SettingsActivity extends AppCompatActivity {
     private ArrayList<Contact> contactArrayList;
 
     private double maxGValue = 0;
+    private View labelingSwitchContainer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -109,6 +111,7 @@ public class SettingsActivity extends AppCompatActivity {
         trackingSwitchTextView = (TextView) findViewById(R.id.tracking_switch_text);
         trackingSwitch = (SwitchCompat) findViewById(R.id.tracking_switch);
         numberPicker = (NumberPicker) findViewById(R.id.numb_picker_settings);
+        labelingSwitchContainer = findViewById(R.id.labeling_switch_container);
         numberPicker.setWrapSelectorWheel(false);
         timeToWait = prefs.getInt(TIME_TO_WAIT, defaultTimeToWait);
 
@@ -180,6 +183,16 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         if (BuildConfig.DEBUG) {
+            labelingSwitchContainer.setVisibility(View.VISIBLE);
+            ((SwitchCompat) labelingSwitchContainer.findViewById(R.id.labeling_switch)).setOnCheckedChangeListener
+                (new CompoundButton.OnCheckedChangeListener() {
+                    @Override public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                        SharedPreferences.Editor editor = prefs.edit();
+                        editor.putBoolean(LABELING_ENABLED, isChecked);
+                        editor.apply();
+
+                    }
+                });
             initDebugTools();
         }
     }
