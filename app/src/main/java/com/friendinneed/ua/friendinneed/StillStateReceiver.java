@@ -21,10 +21,10 @@ public class StillStateReceiver extends BroadcastReceiver {
         switch (fenceState.getCurrentState()) {
             case FenceState.TRUE:
                 // TODO test this precisely then uncomment
-                InNeedService.suspendInnedService(context);
+                //InNeedService.suspendInnedService(context);
                 break;
             case FenceState.FALSE:
-                InNeedService.resumeInnedService(context);
+                //InNeedService.resumeInnedService(context);
                 break;
             default:
                 //unknown state!
