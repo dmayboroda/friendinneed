@@ -1,33 +1,38 @@
 <resources>
-    <string name="app_name">friendinneed</string>
+  <string name="app_name">friendinneed</string>
 
-    <string name="navigation_drawer_open">Open navigation drawer</string>
-    <string name="navigation_drawer_close">Close navigation drawer</string>
+  <string name="navigation_drawer_open">Open navigation drawer</string>
+  <string name="navigation_drawer_close">Close navigation drawer</string>
 
-    <string name="action_settings">Settings</string>
-    <string name="menu_settings">Settings</string>
-    <string name="widget_name">FriendInNeed</string>
-    <string name="send">Send alarm</string>
-    <string name="discard">Discard</string>
-    <string name="dialog_title">Fall detected</string>
-    <string name="dialog_labeling_title">was it a real fall?</string>
-    <string name="choose_contact">Choose contact</string>
-    <string name="create_add_contact">Create contact</string>
-    <string name="dialog_title_formatted">Fall detected\nCAll for help in: %d sec</string>
+  <string name="action_settings">Settings</string>
+  <string name="menu_settings">Settings</string>
+  <string name="widget_name">FriendInNeed</string>
+  <string name="send">Send alarm</string>
+  <string name="discard">Discard</string>
+  <string name="dialog_title">Fall detected</string>
+  <string name="dialog_labeling_title">was it a real fall?</string>
+  <string name="choose_contact">Choose contact</string>
+  <string name="create_add_contact">Create contact</string>
+  <string name="dialog_title_formatted">Fall detected\nCAll for help in: %d sec</string>
 
-    <string name="add_contact">Add contact</string>
-    <string name="turn_on_tracking">Turn on tracking for start</string>
-    <string name="emergency_contacts">Emergency cotacts:</string>
-    <string name="number_picker_settings_text">Period of time before sending message after falling in seconds</string>
-    <string name="tracking_is_running">Tracking is running</string>
-    <string name="tracking_is_on">Tracking is running</string>
-    <string name="delete_contact_txt">Delete this contact?</string>
-    <string name="yes_txt">Yes</string>
-    <string name="no_txt">No</string>
-    <string name="contacts_perm_accept">Please accept CONTACT ACCESS permissions</string>
-    <string name="location_perm_accept">Please accept LOCATION ACCESS permissions</string>
-    <string name="sms_perm_accept">Please accept SMS SEDNDING ACCESS permissions</string>
-    <string name="location_sms_windows_features_perm_accept">Please accept LOCATION, SMS SENDING ACCESS and WINDOWS FEATURES permissions</string>
-    <string name="is_protecting_you">FriendInNeed is protecting You!</string>
+  <string name="add_contact">Add contact</string>
+  <string name="turn_on_tracking">Turn on tracking for start</string>
+  <string name="emergency_contacts">Emergency cotacts:</string>
+  <string name="number_picker_settings_text">Period of time before sending message after falling in seconds</string>
+  <string name="tracking_is_running">Tracking is running</string>
+  <string name="tracking_is_on">Tracking is running</string>
+  <string name="delete_contact_txt">Delete this contact?</string>
+  <string name="yes_txt">Yes</string>
+  <string name="no_txt">No</string>
+  <string name="contacts_perm_accept">Please accept CONTACT ACCESS permissions</string>
+  <string name="location_perm_accept">Please accept LOCATION ACCESS permissions</string>
+  <string name="sms_perm_accept">Please accept SMS SEDNDING ACCESS permissions</string>
+  <string name="location_sms_windows_features_perm_accept">Please accept LOCATION, SMS SENDING ACCESS and WINDOWS FEATURES permissions</string>
+  <string name="is_protecting_you">FriendInNeed is protecting You!</string>
   <string name="turn_on_labeling">Labeling mode</string>
+  <string name="gps_enable_rationale">Gps is disabled, in order to use the application properly you need to enable
+        GPS on your device</string>
+  <string name="gps_enable_title">GPS Disabled</string>
+  <string name="enable_gps_label">Enable GPS</string>
+  <string name="sad_text_for_no_gps_option">You will not be able to call for help without GPS enabled...</string>
 </resources>
