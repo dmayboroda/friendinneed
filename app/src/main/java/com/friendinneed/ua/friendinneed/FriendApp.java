@@ -38,6 +38,7 @@ public class FriendApp extends Application {
   }
 
   private void initDevTools() {
+
     Stetho.initializeWithDefaults(this);
     if (BuildConfig.DEBUG) {
       Timber.plant(new Timber.DebugTree());

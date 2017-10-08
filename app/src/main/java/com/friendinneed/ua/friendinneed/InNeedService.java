@@ -40,6 +40,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Toast;
 
+import com.friendinneed.ua.friendinneed.di.AppExecutors;
 import com.friendinneed.ua.friendinneed.model.AccelerometerDataSample;
 import com.friendinneed.ua.friendinneed.model.Contact;
 import com.friendinneed.ua.friendinneed.model.DataSample;
@@ -59,6 +60,7 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.inject.Inject;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -114,6 +116,8 @@ public class InNeedService extends Service implements SensorEventListener, Googl
   Vibrator mVibrator;
   private CountDownTimer userCountDownTimer;
   private CountDownTimer inactivityFirstTimer;
+
+  @Inject AppExecutors appExecutors;
 
   private DialogInterface.OnClickListener onSendDataCollectionDialogClickListener =
       new DialogInterface.OnClickListener() {
@@ -189,6 +193,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
 
   @Override public void onCreate() {
     super.onCreate();
+    FriendApp.getComponent().inject(this);
     joltCalculator = new JoltCalculator(queue);
     locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
   }
