@@ -39,7 +39,6 @@ import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Toast;
-
 import com.friendinneed.ua.friendinneed.di.AppExecutors;
 import com.friendinneed.ua.friendinneed.model.AccelerometerDataSample;
 import com.friendinneed.ua.friendinneed.model.Contact;
@@ -54,12 +53,10 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
 import com.google.gson.Gson;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import javax.inject.Inject;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -70,55 +67,53 @@ import okhttp3.Response;
 import static com.friendinneed.ua.friendinneed.BuildConfig.DEBUG;
 import static java.lang.Math.sqrt;
 
-public class InNeedService extends Service implements SensorEventListener, GoogleApiClient.ConnectionCallbacks {
+public class InNeedService extends Service implements SensorEventListener, GoogleApiClient.ConnectionCallbacks,
+    InNeedContract.View {
 
   public static final String SOS_MESSAGE_PREFIX = "SOS message - bingo!, http://maps.google.com/maps?z=16&q=loc:";
   public static final String SOS_MESSAGE_NO_LOCATION = "I need Your help, call me please.";
-
-  private GoogleApiClient mGoogleApiClient;
-  private boolean labelingEnabled = true;
   public static final int MILLIS_IN_SECOND = 1000;
-  private static AtomicBoolean isCheckingData = new AtomicBoolean(false);
-  private static AtomicBoolean isDetecting = new AtomicBoolean(false);
+  public static final String FENCE_RECEIVER_ACTION =
+      BuildConfig.APPLICATION_ID + ".FENCE_RECEIVER_ACTION";
+  public static final String START_FENCE_KEY = "start_fence_key";
+  public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
   private static final String TAG = InNeedService.class.getSimpleName();
   private static final String ACTION_START = TAG + "_start";
   private static final String ACTION_STOP = TAG + "_stop";
   private static final String ACTION_START_DETECTION = TAG + "_start_detection";
   private static final String ACTION_STOP_DETECTION = TAG + "_stop_detection";
-
-  public static final String FENCE_RECEIVER_ACTION =
-      BuildConfig.APPLICATION_ID + ".FENCE_RECEIVER_ACTION";
-
-  public static final String START_FENCE_KEY = "start_fence_key";
-
   private static final int SERVICE_ID = 0110;
-
   private static final double EPSILON = 0.0;
   private static final int QUEUE_TIMEOUT_MILLIS = 2000;
   private static final int DEFAULT_WAIT_TIME = 15;
-
-  public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
   private static final String BASE_URL = "http://friendinneedserver6099.cloudapp.net";
   private static final String CHECK_FALL_ENDPOINT = "/check_fall";
   private static final int PORT = 5000;
-  private OkHttpClient client;
+  private static AtomicBoolean isCheckingData = new AtomicBoolean(false);
+  private static AtomicBoolean isDetecting = new AtomicBoolean(false);
   private final DataQueue queue = new DataQueue(QUEUE_TIMEOUT_MILLIS);
+  AlertDialog dataCollectionDialog;
+  AlertDialog countDownDialog;
+  Vibrator mVibrator;
+  @Inject AppExecutors appExecutors;
+  @Inject
+  InNeedApi inNeedApi;
+  @Inject
+  Repository repository;
+  @Inject
+  InNeedPresenter presenter;
+  private GoogleApiClient mGoogleApiClient;
+  private boolean labelingEnabled = true;
+  private OkHttpClient client;
   private JoltCalculator joltCalculator;
   private AsyncTask<Integer, Void, Void> requestSendAsyncTask = getSendDataTask();
-  private AsyncTask<Void, Void, Void> requestCheckAsyncTask = getSendCheckDataTask();
   private StillStateReceiver mFenceReceiver;
   private SensorManager mSensorManager;
   private Sensor mAccelerometerSensor;
   private Sensor mGyroSensor;
   private Sensor mSignificantMotionSensor;
-  AlertDialog dataCollectionDialog;
-  AlertDialog countDownDialog;
-  Vibrator mVibrator;
   private CountDownTimer userCountDownTimer;
   private CountDownTimer inactivityFirstTimer;
-
-  @Inject AppExecutors appExecutors;
-
   private DialogInterface.OnClickListener onSendDataCollectionDialogClickListener =
       new DialogInterface.OnClickListener() {
         public void onClick(DialogInterface dialog, int id) {
@@ -135,16 +130,6 @@ public class InNeedService extends Service implements SensorEventListener, Googl
           resumeInnedService(getApplicationContext());
         }
       };
-  private DialogInterface.OnClickListener onSendFallClickListener = new DialogInterface.OnClickListener() {
-    public void onClick(DialogInterface dialog, int id) {
-      if (userCountDownTimer != null) {
-        userCountDownTimer.cancel();
-      }
-      callForHelp();
-      dialog.dismiss();
-      resumeInnedService(getApplicationContext());
-    }
-  };
   private DialogInterface.OnClickListener onDiscardFallClickListener = new DialogInterface.OnClickListener() {
     public void onClick(DialogInterface dialog, int id) {
       if (userCountDownTimer != null) {
@@ -187,15 +172,19 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     }
   };
   private LocationManager locationManager;
+  private AsyncTask<Void, Void, Void> requestCheckAsyncTask = getSendCheckDataTask();
+  private DialogInterface.OnClickListener onSendFallClickListener = new DialogInterface.OnClickListener() {
+    public void onClick(DialogInterface dialog, int id) {
+      if (userCountDownTimer != null) {
+        userCountDownTimer.cancel();
+      }
+      callForHelp();
+      dialog.dismiss();
+      resumeInnedService(getApplicationContext());
+    }
+  };
 
   public InNeedService() {
-  }
-
-  @Override public void onCreate() {
-    super.onCreate();
-    FriendApp.getComponent().inject(this);
-    joltCalculator = new JoltCalculator(queue);
-    locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
   }
 
   public static void startInneedService(Context context) {
@@ -220,6 +209,14 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     Intent intent = new Intent(context, InNeedService.class);
     intent.setAction(ACTION_START_DETECTION);
     context.startService(intent);
+  }
+
+  @Override public void onCreate() {
+    super.onCreate();
+    FriendApp.getComponent().inject(this);
+    presenter.onTakeView(this);
+    joltCalculator = new JoltCalculator(queue);
+    locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
   }
 
   @Override
@@ -362,13 +359,78 @@ public class InNeedService extends Service implements SensorEventListener, Googl
   }
 
   void sendCheckRequest() {
-    requestCheckAsyncTask = getSendCheckDataTask();
-    requestCheckAsyncTask.execute();
+    //requestCheckAsyncTask = getSendCheckDataTask();
+    //requestCheckAsyncTask.execute();
+    presenter.checkFall(new DataSampleRequest(queue.getDataSamples(), 0));
+    //repository.checkFall(new DataSampleRequest(queue.getDataSamples(), 0), new Callback<String>() {
+    //  @Override public void onResponse(Call<String> call, retrofit2.Response<String> response) {
+    //    onCheckFallSuccess(response);
+    //  }
+    //
+    //  @Override public void onFailure(Call<String> call, Throwable t) {
+    //    onCheckFallFail();
+    //  }
+    //});
   }
 
-  void sendDataRequest(int label) {
-    requestSendAsyncTask = getSendDataTask();
-    requestSendAsyncTask.execute(label);
+  //private void onCheckFallFail() {
+  //  isCheckingData.set(false);
+  //  Log.v(TAG, "no connection most probably");
+  //}
+
+  //private void onCheckFallSuccess(retrofit2.Response<String> response) {
+  //  Log.v(TAG, response.body());
+  //  if (Boolean.TRUE == Boolean.parseBoolean(response.body())) {
+  //    countDownDialog.show();
+  //    mVibrator.vibrate(800);
+  //    userCountDownTimer = new CountDownTimer(getSharedPreferences(
+  //        SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
+  //        getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
+  //        MILLIS_IN_SECOND) {
+  //      @Override
+  //      public void onTick(long millisUntilFinished) {
+  //        countDownDialog.setTitle(String.format(getString(R.string.dialog_title_formatted),
+  //            (millisUntilFinished / MILLIS_IN_SECOND)));
+  //        Log.d(TAG, "userCountDownTimer is ticking: " +
+  //            (millisUntilFinished / MILLIS_IN_SECOND));
+  //      }
+  //
+  //      @Override
+  //      public void onFinish() {
+  //        Log.d(TAG, "Calling for help");
+  //        callForHelp();
+  //        mSensorManager.cancelTriggerSensor(mCountdownOffTriggerEventListener,
+  //            mSignificantMotionSensor);
+  //        countDownDialog.dismiss();
+  //        isCheckingData.set(false);
+  //        cancel();
+  //      }
+  //    }.start();
+  //    mSensorManager.requestTriggerSensor(mCountdownOffTriggerEventListener,
+  //        mSignificantMotionSensor);
+  //  } else {
+  //    isCheckingData.set(false);
+  //  }
+  //}
+
+  void sendDataRequest(final int label) {
+    //requestSendAsyncTask = getSendDataTask();
+    //requestSendAsyncTask.execute(label);
+    presenter.sendTestFallData(new DataSampleRequest(queue.getDataSamples(), label));
+    //appExecutors.getNetworkExecutor().execute(new Runnable() {
+    //  @Override public void run() {
+    //    inNeedApi.saveSampleDataLabeled(new DataSampleRequest(queue.getDataSamples(), label)).enqueue(
+    //        new Callback<String>() {
+    //          @Override public void onResponse(Call<String> call, final retrofit2.Response<String> response) {
+    //
+    //          }
+    //
+    //          @Override public void onFailure(Call<String> call, Throwable t) {
+    //
+    //          }
+    //        });
+    //  }
+    //});
   }
 
   @Nullable
@@ -526,7 +588,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     ArrayList<Contact> contactsArray = SettingsActivity.getContactsListSharePref(this);
     try {
       for (Contact contact : contactsArray) {
-        Log.d(TAG, "callForHelp sending sms to "+contact.getContactNumber());
+        Log.d(TAG, "callForHelp sending sms to " + contact.getContactNumber());
         sms.sendTextMessage(contact.getContactNumber(), null, message, null, null);
       }
       Toast.makeText(getApplicationContext(), "SMS sent.", Toast.LENGTH_LONG).show();
@@ -535,9 +597,6 @@ public class InNeedService extends Service implements SensorEventListener, Googl
       e.printStackTrace();
     }
   }
-
-
-
 
   private AsyncTask<Integer, Void, Void> getSendDataTask() {
     return new AsyncTask<Integer, Void, Void>() {
@@ -710,5 +769,53 @@ public class InNeedService extends Service implements SensorEventListener, Googl
       poke.setData(Uri.parse("3"));
       sendBroadcast(poke);
     }
+  }
+
+  @Override public void onCheckFallSuccess(String result) {
+    if (Boolean.TRUE == Boolean.parseBoolean(result)) {
+      countDownDialog.show();
+      mVibrator.vibrate(800);
+      userCountDownTimer = new CountDownTimer(getSharedPreferences(
+          SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
+          getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
+          MILLIS_IN_SECOND) {
+        @Override
+        public void onTick(long millisUntilFinished) {
+          countDownDialog.setTitle(String.format(getString(R.string.dialog_title_formatted),
+              (millisUntilFinished / MILLIS_IN_SECOND)));
+          Log.d(TAG, "userCountDownTimer is ticking: " +
+              (millisUntilFinished / MILLIS_IN_SECOND));
+        }
+
+        @Override
+        public void onFinish() {
+          Log.d(TAG, "Calling for help");
+          callForHelp();
+          mSensorManager.cancelTriggerSensor(mCountdownOffTriggerEventListener,
+              mSignificantMotionSensor);
+          countDownDialog.dismiss();
+          isCheckingData.set(false);
+          cancel();
+        }
+      }.start();
+      mSensorManager.requestTriggerSensor(mCountdownOffTriggerEventListener,
+          mSignificantMotionSensor);
+    } else {
+      isCheckingData.set(false);
+    }
+  }
+
+  @Override public void onCheckFallFailure(Throwable t) {
+    isCheckingData.set(false);
+    Log.v(TAG, "no connection most probably");
+  }
+
+  @Override public void onSendFallSuccess(String result) {
+    Log.d(TAG, "success sent labeled data to server");
+    Log.v(TAG, result);
+  }
+
+  @Override public void onSendFallFailure(Throwable t) {
+    Log.d(TAG, "error sending labeled data to server: " + t.getMessage());
   }
 }

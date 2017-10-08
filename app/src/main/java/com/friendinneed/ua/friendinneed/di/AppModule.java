@@ -4,7 +4,10 @@ import android.app.Application;
 import android.content.Context;
 import com.facebook.stetho.okhttp3.StethoInterceptor;
 import com.friendinneed.ua.friendinneed.BuildConfig;
+import com.friendinneed.ua.friendinneed.InNeedApi;
+import com.friendinneed.ua.friendinneed.InNeedRepository;
 import com.friendinneed.ua.friendinneed.R;
+import com.friendinneed.ua.friendinneed.Repository;
 import dagger.Module;
 import dagger.Provides;
 import java.util.Arrays;
@@ -15,12 +18,10 @@ import javax.inject.Singleton;
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
-/**
- * Created by skozyrev on 10/8/17.
- */
-@Module
-class AppModule {
+@Module class AppModule {
 
   private static final long READ_TIMEOUT = 60;
   private static final long CONNECTION_TIMEOUT = 60;
@@ -54,7 +55,6 @@ class AppModule {
     return builder.build();
   }
 
-
   @Provides
   @NetworkInterceptors
   List<Interceptor> provideNetworkInterceptors() {
@@ -68,10 +68,24 @@ class AppModule {
         HttpLoggingInterceptor.Level.NONE);
     return interceptor;
   }
+
   @Provides
   List<Interceptor> provideInterceptors(HttpLoggingInterceptor httpLoggingInterceptor) {
     return Arrays.<Interceptor>asList(httpLoggingInterceptor);
   }
 
+  @Provides
+  InNeedApi provideApi(OkHttpClient okHttpClient, String baseUrl) {
+    Retrofit retrofit = new Retrofit.Builder()
+        .baseUrl(baseUrl)
+        .client(okHttpClient)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build();
 
+    return retrofit.create(InNeedApi.class);
+  }
+
+  @Provides Repository provideRepository(InNeedRepository inNeedRepository){
+    return inNeedRepository;
+  }
 }
