@@ -23,6 +23,7 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.IBinder;
@@ -221,9 +222,9 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     super.onCreate();
     FriendApp.getComponent().inject(this);
     NotificationUtils.ensureNotificationChannel(this, NotificationUtils.FIN_CHANNEL_ID);
-    presenter.onTakeView(this);
+    presenter.takeView(this);
     joltCalculator = new JoltCalculator(queue);
-    locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
+    init();
   }
 
   @Override
@@ -253,10 +254,16 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     labelingEnabled = getSharedPreferences(
         SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
         getBoolean(SettingsActivity.LABELING_ENABLED, false);
+    startDetection();
+    calculate();
+  }
+
+  private void init() {
+    locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
     mGoogleApiClient = new GoogleApiClient.Builder(this)
-        .addApi(Awareness.API)
-        .addConnectionCallbacks(this)
-        .build();
+      .addApi(Awareness.API)
+      .addConnectionCallbacks(this)
+      .build();
     OkHttpClient.Builder clientBuilder = new OkHttpClient.Builder();
     clientBuilder.connectTimeout(20000, TimeUnit.MILLISECONDS);
     clientBuilder.retryOnConnectionFailure(false);
@@ -268,8 +275,6 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     mAccelerometerSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
     mGyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
     mSignificantMotionSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_SIGNIFICANT_MOTION);
-    startDetection();
-    calculate();
   }
 
   private void startDetection() {
@@ -383,7 +388,9 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     AlertDialog dialog = builder.create();
     Window dialogWindow = dialog.getWindow();
     if (dialogWindow != null) {
-      dialogWindow.setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+      dialogWindow.setType(
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+          : WindowManager.LayoutParams.TYPE_PHONE);
       return dialog;
     }
     return null;

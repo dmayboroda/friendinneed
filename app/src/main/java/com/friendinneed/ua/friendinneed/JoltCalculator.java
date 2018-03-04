@@ -21,8 +21,8 @@ public class JoltCalculator {
     this.queue = queue;
   }
 
-  private static int joltErrors = 0;
-  private static int hugeHitsCount = 0;
+  private  int joltErrors = 0;
+  private  int hugeHitsCount = 0;
 
   boolean checkForJolt2(float accX, float accY, float accZ) {
     double gValue = calculateGValue(accX, accY, accZ);
@@ -46,12 +46,12 @@ public class JoltCalculator {
 
     double gValue = calculateGValue(accX, accY, accZ);
     long filledQueuePercentage = queue.getTimeElapsedSinceStartPercents();
-    if (filledQueuePercentage>70) {
-    Log.v(TAG, "current vector: " + gValue + ", state: " + joltState.name() + " errors: "+joltErrors + " filled % " +
+    if (filledQueuePercentage>10) {
+    Log.w(TAG, "current vector: " + gValue + ", state: " + joltState.name() + " errors: "+joltErrors + " filled % " +
         filledQueuePercentage);}
     if (joltState == JoltState.FREE_FALL) {
       if (!isFreeFall(gValue)) {
-        if (filledQueuePercentage > 20) {
+        if (filledQueuePercentage > 18) {
           joltState = JoltState.JUMPING_BACK_AND_FORCE;
         } else {
           joltErrors++;
@@ -59,7 +59,7 @@ public class JoltCalculator {
       }
     } else if (joltState == JoltState.JUMPING_BACK_AND_FORCE) {
       if (!isJumpingBackAndForce2(gValue) ) {
-        if (filledQueuePercentage > 31) {
+        if (filledQueuePercentage > 30) {
           joltState = JoltState.STILL_ON_FLOOR;
         } else {
           joltErrors++;
@@ -67,7 +67,7 @@ public class JoltCalculator {
       }
     } else if (joltState == JoltState.FREE_FALL_AGAIN) {
       if (!isFreeFall(gValue)) {
-        if (filledQueuePercentage > 29) {
+        if (filledQueuePercentage > 35) {
           joltState = JoltState.JUMP_AGAIN;
         } else {
           joltErrors++;
@@ -75,14 +75,14 @@ public class JoltCalculator {
       }
     } else if (joltState == JoltState.JUMP_AGAIN) {
       if (!isSmallJumping(gValue)) {
-        if (filledQueuePercentage > 31) {
+        if (filledQueuePercentage > 40) {
           joltState = JoltState.STILL_ON_FLOOR;
         } else {
           joltErrors++;
         }
       }
     } else if (joltState == JoltState.STILL_ON_FLOOR) {
-      if (!stillOnFloor(gValue)) {
+      if (!stillOnFloor(gValue) || filledQueuePercentage < 35) {
         joltErrors++;
       }
     }
@@ -92,11 +92,18 @@ public class JoltCalculator {
       joltErrors = 0;
       joltState=JoltState.FREE_FALL;
     }
-    if (filledQueuePercentage > 95){// && hugeHitsCount != 0){
+    if (filledQueuePercentage > 95 ){//&& hugeHitsCount != 0){
       hugeHitsCount = 0;
       joltErrors = 0;
-      queue.prepareSample();
-      return true;
+      joltState=JoltState.FREE_FALL;
+
+      if (queue.size() > 200) {
+        queue.prepareSample();
+        return true;
+      } else {
+        queue.clear();
+        return false;
+      }
     } else {
       return false;
     }

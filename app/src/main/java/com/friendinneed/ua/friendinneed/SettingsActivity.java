@@ -215,7 +215,7 @@ public class SettingsActivity extends AppCompatActivity {
               editor.apply();
             }
           });
-      initDebugTools();
+      //initDebugTools();
     }
   }
 
