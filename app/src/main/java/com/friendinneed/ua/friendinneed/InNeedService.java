@@ -45,6 +45,7 @@ import com.friendinneed.ua.friendinneed.model.Contact;
 import com.friendinneed.ua.friendinneed.model.DataSample;
 import com.friendinneed.ua.friendinneed.model.DataSampleRequest;
 import com.friendinneed.ua.friendinneed.model.GyroscopeDataSample;
+import com.friendinneed.ua.friendinneed.util.NotificationUtils;
 import com.google.android.gms.awareness.Awareness;
 import com.google.android.gms.awareness.fence.AwarenessFence;
 import com.google.android.gms.awareness.fence.DetectedActivityFence;
@@ -65,6 +66,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import static com.friendinneed.ua.friendinneed.BuildConfig.DEBUG;
+import static com.friendinneed.ua.friendinneed.util.BackgroundServiceCompatStarterUtils.startServiceCompatFromBackground;
 import static java.lang.Math.sqrt;
 
 public class InNeedService extends Service implements SensorEventListener, GoogleApiClient.ConnectionCallbacks,
@@ -190,9 +192,13 @@ public class InNeedService extends Service implements SensorEventListener, Googl
   public static void startInneedService(Context context) {
     Intent intent = new Intent(context, InNeedService.class);
     intent.setAction(ACTION_START);
-    context.startService(intent);
+    startServiceCompatFromBackground(context, intent);
   }
 
+  /**
+   * To be called from UI
+   * @param context
+   */
   public static void stopInnedService(Context context) {
     Intent intent = new Intent(context, InNeedService.class);
     intent.setAction(ACTION_STOP);
@@ -202,18 +208,19 @@ public class InNeedService extends Service implements SensorEventListener, Googl
   public static void suspendInnedService(Context context) {
     Intent intent = new Intent(context, InNeedService.class);
     intent.setAction(ACTION_STOP_DETECTION);
-    context.startService(intent);
+    startServiceCompatFromBackground(context, intent);
   }
 
   public static void resumeInnedService(Context context) {
     Intent intent = new Intent(context, InNeedService.class);
     intent.setAction(ACTION_START_DETECTION);
-    context.startService(intent);
+    startServiceCompatFromBackground(context, intent);
   }
 
   @Override public void onCreate() {
     super.onCreate();
     FriendApp.getComponent().inject(this);
+    NotificationUtils.ensureNotificationChannel(this, NotificationUtils.FIN_CHANNEL_ID);
     presenter.onTakeView(this);
     joltCalculator = new JoltCalculator(queue);
     locationManager = (LocationManager) getApplicationContext().getSystemService(LOCATION_SERVICE);
@@ -222,6 +229,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
   @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
     if (null != intent) {
+      startForeground(SERVICE_ID, createNotification());
       if (intent.getAction().equals(ACTION_START)) {
         start();
       } else if (intent.getAction().equals(ACTION_STOP)) {
@@ -261,7 +269,6 @@ public class InNeedService extends Service implements SensorEventListener, Googl
     mGyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
     mSignificantMotionSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_SIGNIFICANT_MOTION);
     startDetection();
-    startForeground(SERVICE_ID, createNotification());
     calculate();
   }
 
@@ -315,7 +322,7 @@ public class InNeedService extends Service implements SensorEventListener, Googl
   }
 
   private Notification createNotification() {
-    return new NotificationCompat.Builder(this)
+    return new NotificationCompat.Builder(this, NotificationUtils.FIN_CHANNEL_ID)
         .setContentTitle(getString(R.string.is_protecting_you))
         .setSmallIcon(R.drawable.ic_notif)
         .setLargeIcon(createBitmap())
@@ -359,78 +366,11 @@ public class InNeedService extends Service implements SensorEventListener, Googl
   }
 
   void sendCheckRequest() {
-    //requestCheckAsyncTask = getSendCheckDataTask();
-    //requestCheckAsyncTask.execute();
     presenter.checkFall(new DataSampleRequest(queue.getDataSamples(), 0));
-    //repository.checkFall(new DataSampleRequest(queue.getDataSamples(), 0), new Callback<String>() {
-    //  @Override public void onResponse(Call<String> call, retrofit2.Response<String> response) {
-    //    onCheckFallSuccess(response);
-    //  }
-    //
-    //  @Override public void onFailure(Call<String> call, Throwable t) {
-    //    onCheckFallFail();
-    //  }
-    //});
   }
 
-  //private void onCheckFallFail() {
-  //  isCheckingData.set(false);
-  //  Log.v(TAG, "no connection most probably");
-  //}
-
-  //private void onCheckFallSuccess(retrofit2.Response<String> response) {
-  //  Log.v(TAG, response.body());
-  //  if (Boolean.TRUE == Boolean.parseBoolean(response.body())) {
-  //    countDownDialog.show();
-  //    mVibrator.vibrate(800);
-  //    userCountDownTimer = new CountDownTimer(getSharedPreferences(
-  //        SettingsActivity.SHARED_PREFS_NAME, Context.MODE_PRIVATE).
-  //        getInt(SettingsActivity.TIME_TO_WAIT, DEFAULT_WAIT_TIME) * MILLIS_IN_SECOND,
-  //        MILLIS_IN_SECOND) {
-  //      @Override
-  //      public void onTick(long millisUntilFinished) {
-  //        countDownDialog.setTitle(String.format(getString(R.string.dialog_title_formatted),
-  //            (millisUntilFinished / MILLIS_IN_SECOND)));
-  //        Log.d(TAG, "userCountDownTimer is ticking: " +
-  //            (millisUntilFinished / MILLIS_IN_SECOND));
-  //      }
-  //
-  //      @Override
-  //      public void onFinish() {
-  //        Log.d(TAG, "Calling for help");
-  //        callForHelp();
-  //        mSensorManager.cancelTriggerSensor(mCountdownOffTriggerEventListener,
-  //            mSignificantMotionSensor);
-  //        countDownDialog.dismiss();
-  //        isCheckingData.set(false);
-  //        cancel();
-  //      }
-  //    }.start();
-  //    mSensorManager.requestTriggerSensor(mCountdownOffTriggerEventListener,
-  //        mSignificantMotionSensor);
-  //  } else {
-  //    isCheckingData.set(false);
-  //  }
-  //}
-
   void sendDataRequest(final int label) {
-    //requestSendAsyncTask = getSendDataTask();
-    //requestSendAsyncTask.execute(label);
     presenter.sendTestFallData(new DataSampleRequest(queue.getDataSamples(), label));
-    //appExecutors.getNetworkExecutor().execute(new Runnable() {
-    //  @Override public void run() {
-    //    inNeedApi.saveSampleDataLabeled(new DataSampleRequest(queue.getDataSamples(), label)).enqueue(
-    //        new Callback<String>() {
-    //          @Override public void onResponse(Call<String> call, final retrofit2.Response<String> response) {
-    //
-    //          }
-    //
-    //          @Override public void onFailure(Call<String> call, Throwable t) {
-    //
-    //          }
-    //        });
-    //  }
-    //});
   }
 
   @Nullable

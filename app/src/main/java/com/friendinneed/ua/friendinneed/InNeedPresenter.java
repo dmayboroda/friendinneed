@@ -2,6 +2,7 @@ package com.friendinneed.ua.friendinneed;
 
 import com.friendinneed.ua.friendinneed.di.AppExecutors;
 import com.friendinneed.ua.friendinneed.model.DataSampleRequest;
+import javax.inject.Inject;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.HttpException;
@@ -16,6 +17,7 @@ public class InNeedPresenter extends BasePresenter<InNeedContract.View> {
   private final InNeedRepository inNeedRepository;
   private final AppExecutors appExecutors;
 
+  @Inject
   public InNeedPresenter(InNeedRepository inNeedRepository, AppExecutors appExecutors) {
     this.inNeedRepository = inNeedRepository;
     this.appExecutors = appExecutors;
