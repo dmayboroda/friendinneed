@@ -25,6 +25,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SwitchCompat;
+import android.text.method.LinkMovementMethod;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -217,6 +218,20 @@ public class SettingsActivity extends AppCompatActivity {
           });
       //initDebugTools();
     }
+
+    setupPrivacyPolicy();
+  }
+
+  private void setupPrivacyPolicy() {
+    TextView txt = findViewById(R.id.privacy_policy_text);
+    txt.setMovementMethod(LinkMovementMethod.getInstance());
+    txt.setOnClickListener(new View.OnClickListener() {
+      public void onClick(View v) {
+        Intent browserIntent = new Intent(Intent.ACTION_VIEW);
+        browserIntent.setData(Uri.parse(getString(R.string.privacy_policy_url)));
+        startActivity(browserIntent);
+      }
+    });
   }
 
   private void initDebugTools() {

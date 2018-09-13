@@ -36,5 +36,7 @@
   <string name="gps_enable_title">GPS Disabled</string>
   <string name="enable_gps_label">Enable GPS</string>
   <string name="sad_text_for_no_gps_option">You will not be able to call for help without GPS enabled…</string>
+    <string name="privacy_policy_label">Privacy Policy</string>
+  <string name="privacy_policy_url">https://docs.google.com/document/d/1uc8rIw4AzpCDDqCQcGvoiPTHAGhGMsjLJyAkIAR4_Qk/edit?usp=sharing</string>
 
 </resources>
